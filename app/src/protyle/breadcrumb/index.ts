@@ -13,7 +13,6 @@ import {needSubscribe} from "../../util/needSubscribe";
 import {isMobile} from "../../util/functions";
 import {zoomOut} from "../../menus/protyle";
 import {getEditorRange} from "../util/selection";
-import {setPadding} from "../ui/initUI";
 /// #if !MOBILE
 import {openFileById} from "../../editor/util";
 import {setPanelFocus} from "../../layout/util";
@@ -405,7 +404,6 @@ export class Breadcrumb {
                 label: window.siyuan.languages.fullscreen,
                 click: () => {
                     fullscreen(protyle.element);
-                    setPadding(protyle);
                 }
             }).element);
             /// #endif
