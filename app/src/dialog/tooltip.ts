@@ -17,11 +17,6 @@ export const showTooltip = (message: string, target: Element, error = false) => 
     } else {
         messageElement.innerHTML = message;
     }
-    if (target.parentElement.getAttribute("data-type") === "navigation-file") {
-        const parentRect = target.parentElement.getBoundingClientRect();
-        setPosition(messageElement, parentRect.right + 8, parentRect.top);
-        return;
-    }
     if (error) {
         messageElement.classList.add("tooltip--error");
     } else {
@@ -33,15 +28,24 @@ export const showTooltip = (message: string, target: Element, error = false) => 
         messageElement.classList.remove("tooltip--memo");
     }
     let left = targetRect.left;
-    if (target.getAttribute("data-position") === "right") {
+    let top = targetRect.bottom;
+    const position = target.getAttribute("data-position")
+    const parentRect = target.parentElement.getBoundingClientRect();
+    if (position === "right") {
+        // block icon
         left = targetRect.right - messageElement.clientWidth;
+    } else if (position === "parentE") {
+        // file tree and outline、backlink
+        top = parentRect.top;
+        left = parentRect.right + 8;
     }
-    const bottomHeight = window.innerHeight - targetRect.bottom;
-    messageElement.style.maxHeight = Math.max(targetRect.top, bottomHeight) + "px";
-    if (targetRect.top > bottomHeight) {
-        messageElement.style.top = (targetRect.top - messageElement.clientHeight) + "px";
+    const topHeight = position === "parentE" ? top : targetRect.top;
+    const bottomHeight = window.innerHeight - top;
+    messageElement.style.maxHeight = Math.max(topHeight, bottomHeight) + "px";
+    if (top + messageElement.clientHeight > window.innerHeight && topHeight > bottomHeight) {
+        messageElement.style.top = ((position === "parentE" ? parentRect.bottom : targetRect.top) - messageElement.clientHeight) + "px";
     } else {
-        messageElement.style.top = targetRect.bottom + "px";
+        messageElement.style.top = top + "px";
     }
     if (left + messageElement.clientWidth > window.innerWidth) {
         messageElement.style.left = (window.innerWidth - messageElement.clientWidth) + "px";
