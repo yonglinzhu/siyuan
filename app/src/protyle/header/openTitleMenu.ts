@@ -11,13 +11,12 @@ import {deleteFile} from "../../editor/deleteFile";
 import {updateHotkeyTip} from "../util/compatibility";
 /// #if !MOBILE
 import {openBacklink, openGraph, openOutline} from "../../layout/dock/util";
-import {shell} from "electron";
 import * as path from "path";
 /// #endif
 import {Constants} from "../../constants";
 import {openCardByData} from "../../card/openCard";
 import {viewCards} from "../../card/viewCards";
-import {getDisplayName, getNotebookName, pathPosix} from "../../util/pathName";
+import {getDisplayName, getNotebookName, pathPosix, showFileInFolder} from "../../util/pathName";
 import {makeCard, quickMakeCard} from "../../card/makeCard";
 import {emitOpenMenu} from "../../plugin/EventBus";
 import * as dayjs from "dayjs";
@@ -247,7 +246,7 @@ export const openTitleMenu = (protyle: IProtyle, position: {
         window.siyuan.menus.menu.append(new MenuItem({
             label: window.siyuan.languages.showInFolder,
             click: () => {
-                shell.showItemInFolder(path.join(window.siyuan.config.system.dataDir, protyle.notebookId, protyle.path));
+                showFileInFolder(path.join(window.siyuan.config.system.dataDir, protyle.notebookId, protyle.path));
             }
         }).element);
         /// #endif
