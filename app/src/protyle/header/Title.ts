@@ -25,7 +25,6 @@ import {code160to32} from "../util/code160to32";
 import {genEmptyElement} from "../../block/util";
 import {transaction} from "../wysiwyg/transaction";
 import {hideTooltip} from "../../dialog/tooltip";
-import {quickMakeCard} from "../../card/makeCard";
 import {commonClick} from "../wysiwyg/commonClick";
 import {openTitleMenu} from "./openTitleMenu";
 
@@ -144,11 +143,6 @@ export class Title {
                 });
                 event.preventDefault();
                 event.stopPropagation();
-            } else if (matchHotKey(window.siyuan.config.keymap.editor.general.quickMakeCard.custom, event)) {
-                quickMakeCard(protyle, [this.element]);
-                event.preventDefault();
-                event.stopPropagation();
-                return true;
             } else if (matchHotKey("⌘A", event)) {
                 getEditorRange(this.editElement).selectNodeContents(this.editElement);
                 event.preventDefault();

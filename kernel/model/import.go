@@ -22,6 +22,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/siyuan-note/siyuan/kernel/av"
 	"image"
 	"image/jpeg"
 	"image/png"
@@ -153,10 +154,8 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 
 			// 重新指向数据库属性值
 			ial := parse.IAL2Map(n.KramdownIAL)
-			for k, v := range ial {
-				if strings.HasPrefix(k, NodeAttrNamePrefixAvKey) {
-					v = strings.ReplaceAll(v, oldNodeID, newNodeID)
-					n.SetIALAttr(k, v)
+			for k, _ := range ial {
+				if strings.HasPrefix(k, av.NodeAttrNameAvs) {
 					avBlockIDs[oldNodeID] = newNodeID
 				}
 			}
@@ -259,7 +258,7 @@ func ImportSY(zipPath, boxID, toPath string) (err error) {
 
 				ial := parse.IAL2Map(n.KramdownIAL)
 				for k, v := range ial {
-					if strings.HasPrefix(k, NodeAttrNamePrefixAvKey) || strings.HasPrefix(k, NodeAttrNameAvs) {
+					if strings.HasPrefix(k, av.NodeAttrNameAvs) {
 						newKey, newVal := k, v
 						for oldAvID, newAvID := range avIDs {
 							newKey = strings.ReplaceAll(newKey, oldAvID, newAvID)
