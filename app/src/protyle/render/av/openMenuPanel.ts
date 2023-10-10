@@ -660,6 +660,7 @@ export const openMenuPanel = (options: {
                         type: colData.type,
                         avID,
                         colId,
+                        icon: colData.icon,
                         newValue: colData.name
                     });
                     avPanelElement.remove();
@@ -778,7 +779,7 @@ const getPropertiesHTML = (data: IAVTable) => {
     <svg class="b3-menu__icon"><use xlink:href="#iconDrag"></use></svg>
     <div class="fn__flex-1">
         <span class="b3-chip">
-            <svg><use xlink:href="#${getColIconByType(item.type)}"></use></svg>
+            ${item.icon ? unicode2Emoji(item.icon, "icon", true) : `<svg class="icon"><use xlink:href="#${getColIconByType(item.type)}"></use></svg>`}
             <span class="fn__ellipsis">${item.name}</span>
         </span>
     </div>
@@ -790,7 +791,7 @@ const getPropertiesHTML = (data: IAVTable) => {
     <svg class="b3-menu__icon"><use xlink:href="#iconDrag"></use></svg>
     <div class="fn__flex-1">
         <span class="b3-chip">
-            <svg><use xlink:href="#${getColIconByType(item.type)}"></use></svg>
+            ${item.icon ? unicode2Emoji(item.icon, "icon", true) : `<svg class="icon"><use xlink:href="#${getColIconByType(item.type)}"></use></svg>`}
             <span class="fn__ellipsis">${item.name}</span>
         </span>
     </div>
