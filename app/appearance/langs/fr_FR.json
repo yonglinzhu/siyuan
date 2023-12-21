@@ -1,4 +1,31 @@
 {
+  "replaceTypes": {
+    "text": "Texte normal",
+    "imgText": "Texte alternatif de l'image",
+    "imgTitle": "Titre de l'image",
+    "imgSrc": "Lien image",
+    "aText": "Texte d'ancrage du lien",
+    "aTitle": "Titre du lien",
+    "aHref": "Lien lien",
+    "code": "code en ligne",
+    "em": "Italique",
+    "strong": "Audacieux",
+    "inlineMath": "Formule en ligne",
+    "inlineMemo": "Mémo en ligne",
+    "kbd": "Clavier",
+    "mark": "Marquer",
+    "s": "Barré",
+    "sub": "Indice",
+    "sup": "Exposant",
+    "tag": "balise",
+    "u": "Souligner",
+    "docTitle": "Titre du document",
+    "codeBlock": "Bloc de code",
+    "mathBlock": "Bloc de formule",
+    "htmlBlock": "Bloc HTML"
+  },
+  "selected": "Sélectionné",
+  "loadMore": "Charger plus",
   "tempUnlock": "Déverrouiller temporairement",
   "cancelTempUnlock": "Annuler le déverrouillage temporaire",
   "addFilter": "Ajouter un filtre",
@@ -443,6 +470,7 @@
   "cancelMerged": "Annuler la fusion de cellules",
   "useDefaultWidth": "Utiliser la largeur de colonne par défaut",
   "type": "Type",
+  "replaceType": "Remplacer le type",
   "searchBlockType": "Types de bloc (recherche dans les types activés ci-dessous, l'option de filtre dans la recherche globale remplace ce paramètre)",
   "searchBlockAttr": "Attributs de bloc (recherche non seulement dans le contenu, mais aussi dans les attributs activés suivants)",
   "searchIndex": "Index",
@@ -450,6 +478,7 @@
   "searchBackmention": "Mentions de backlink (les mentions de backlink à partir desquelles les mots-clés de recherche sont obtenus)",
   "searchVirtualRef": "Référence virtuelle (les mots-clés de recherche de référence virtuelle sont obtenus à partir de)",
   "netImg2LocalAsset": "Convertir des images réseau en images locales",
+  "netAssets2LocalAssets": "Convertir les actifs réseau en local",
   "releaseDate": "Date de sortie",
   "pkgSize": "Taille du package",
   "installSize": "Taille d'installation",
@@ -1115,6 +1144,10 @@
     "resetWindow": "Réinitialiser la fenêtre et quitter le programme",
     "quit": "Quitter le programme"
   },
+  "_attrView": {
+    "table": "Tableau",
+    "key": "Clé primaire"
+  },
   "_kernel": {
     "0": "Échec du cahier de requêtes",
     "1": "Nom de fichier dupliqué",
@@ -1335,6 +1368,7 @@
     "216": "Reconstruction de l'index des données du contenu des ressources, veuillez patienter...",
     "217": "[%d/%d] Création d'un index de données de contenu d'actif",
     "218": "Trop d'instantanés du référentiel de données ont été détectés, ce qui ralentit le démarrage du programme et la synchronisation des données. Veuillez envisager d'exécuter [Paramètres - À propos - Purge du référentiel de données]",
-    "219": "Le service de stockage cloud n'est pas disponible, veuillez réessayer plus tard"
+    "219": "Le service de stockage cloud n'est pas disponible, veuillez réessayer plus tard",
+    "220": "En raison d'un défaut dans la version précédente, les données cloud sont corrompues. Veuillez vous référer aux étapes User Guide-FAQ-Lost Key pour réinitialiser le référentiel de données local et le répertoire cloud"
   }
 }

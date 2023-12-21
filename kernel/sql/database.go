@@ -798,9 +798,18 @@ func buildBlockFromNode(n *ast.Node, tree *parse.Tree) (block *Block, attributes
 		length = utf8.RuneCountInString(fcontent)
 	} else if n.IsContainerBlock() {
 		markdown = treenode.ExportNodeStdMd(n, luteEngine)
+
+		if !treenode.IsNodeOCRed(n) {
+			util.PushNodeOCRQueue(n.ID)
+		}
 		content = treenode.NodeStaticContent(n, nil, true, indexAssetPath)
 		fc := treenode.FirstLeafBlock(n)
+
+		if !treenode.IsNodeOCRed(fc) {
+			util.PushNodeOCRQueue(fc.ID)
+		}
 		fcontent = treenode.NodeStaticContent(fc, nil, true, false)
+
 		parentID = n.Parent.ID
 		// 将标题块作为父节点
 		if h := heading(n); nil != h {
@@ -809,7 +818,13 @@ func buildBlockFromNode(n *ast.Node, tree *parse.Tree) (block *Block, attributes
 		length = utf8.RuneCountInString(fcontent)
 	} else {
 		markdown = treenode.ExportNodeStdMd(n, luteEngine)
+
+		if !treenode.IsNodeOCRed(n) {
+			util.PushNodeOCRQueue(n.ID)
+		}
+
 		content = treenode.NodeStaticContent(n, nil, true, indexAssetPath)
+
 		parentID = n.Parent.ID
 		// 将标题块作为父节点
 		if h := heading(n); nil != h {
@@ -1107,6 +1122,10 @@ func deleteByRootID(tx *sql.Tx, rootID string, context map[string]interface{}) (
 	if err = execStmtTx(tx, stmt, rootID); nil != err {
 		return
 	}
+	stmt = "DELETE FROM attributes WHERE root_id = ?"
+	if err = execStmtTx(tx, stmt, rootID); nil != err {
+		return
+	}
 	ClearCache()
 	eventbus.Publish(eventbus.EvtSQLDeleteBlocks, context, rootID)
 	return
@@ -1145,6 +1164,10 @@ func batchDeleteByRootIDs(tx *sql.Tx, rootIDs []string, context map[string]inter
 	if err = execStmtTx(tx, stmt); nil != err {
 		return
 	}
+	stmt = "DELETE FROM attributes WHERE root_id IN " + ids
+	if err = execStmtTx(tx, stmt); nil != err {
+		return
+	}
 	ClearCache()
 	eventbus.Publish(eventbus.EvtSQLDeleteBlocks, context, fmt.Sprintf("%d", len(rootIDs)))
 	return
@@ -1178,6 +1201,10 @@ func batchDeleteByPathPrefix(tx *sql.Tx, boxID, pathPrefix string) (err error) {
 		return
 	}
 	stmt = "DELETE FROM file_annotation_refs WHERE box = ? AND path LIKE ?"
+	if err = execStmtTx(tx, stmt, boxID, pathPrefix+"%"); nil != err {
+		return
+	}
+	stmt = "DELETE FROM attributes WHERE box = ? AND path LIKE ?"
 	if err = execStmtTx(tx, stmt, boxID, pathPrefix+"%"); nil != err {
 		return
 	}

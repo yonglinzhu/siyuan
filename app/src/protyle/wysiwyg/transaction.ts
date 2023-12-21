@@ -461,6 +461,11 @@ export const onTransaction = (protyle: IProtyle, operation: IOperation, isUndo: 
                     updateBlock(updateElements, protyle, operation, isUndo);
                 }
             });
+        } else { // updateElements 没有包含嵌入块，在悬浮层编辑嵌入块时，嵌入块也需要更新
+            // 更新 ws 嵌入块
+            updateEmbed(protyle, operation);
+            // 更新 ws 引用块
+            updateRef(protyle, operation.id);
         }
         return;
     }
@@ -471,6 +476,7 @@ export const onTransaction = (protyle: IProtyle, operation: IOperation, isUndo: 
         let nameHTML = "";
         let aliasHTML = "";
         let memoHTML = "";
+        let avHTML = "";
         Object.keys(data.new).forEach(key => {
             attrsResult[key] = data.new[key];
             const escapeHTML = Lute.EscapeHTMLStr(data.new[key]);
@@ -483,10 +489,10 @@ export const onTransaction = (protyle: IProtyle, operation: IOperation, isUndo: 
             } else if (key === "memo") {
                 memoHTML = `<div class="protyle-attr--memo b3-tooltips b3-tooltips__sw" aria-label="${escapeHTML}"><svg><use xlink:href="#iconM"></use></svg></div>`;
             } else if (key === "custom-avs") {
-                memoHTML = "<div class=\"protyle-attr--av\"><svg><use xlink:href=\"#iconDatabase\"></use></svg></div>";
+                avHTML = "<div class=\"protyle-attr--av\"><svg><use xlink:href=\"#iconDatabase\"></use></svg></div>";
             }
         });
-        let nodeAttrHTML = bookmarkHTML + nameHTML + aliasHTML + memoHTML;
+        let nodeAttrHTML = bookmarkHTML + nameHTML + aliasHTML + memoHTML + avHTML;
         if (protyle.block.rootID === operation.id) {
             // 文档
             if (protyle.title) {
@@ -711,8 +717,9 @@ export const onTransaction = (protyle: IProtyle, operation: IOperation, isUndo: 
         "updateAttrViewColOption", "updateAttrViewCell", "sortAttrViewRow", "sortAttrViewCol", "setAttrViewColHidden",
         "setAttrViewColWrap", "setAttrViewColWidth", "removeAttrViewColOption", "setAttrViewName", "setAttrViewFilters",
         "setAttrViewSorts", "setAttrViewColCalc", "removeAttrViewCol", "updateAttrViewColNumberFormat", "removeAttrViewBlock",
-        "replaceAttrViewBlock", "updateAttrViewColTemplate", "setAttrViewColIcon", "setAttrViewColPin", "addAttrViewView",
-        "removeAttrViewView", "setAttrViewViewName", "setAttrViewViewIcon", "duplicateAttrViewView", "sortAttrViewView"].includes(operation.action)) {
+        "replaceAttrViewBlock", "updateAttrViewColTemplate", "setAttrViewColPin", "addAttrViewView",
+        "removeAttrViewView", "setAttrViewViewName", "setAttrViewViewIcon", "duplicateAttrViewView", "sortAttrViewView",
+        "setAttrViewPageSize"].includes(operation.action)) {
         refreshAV(protyle, operation, isUndo);
     } else if (operation.action === "doUpdateUpdated") {
         updateElements.forEach(item => {

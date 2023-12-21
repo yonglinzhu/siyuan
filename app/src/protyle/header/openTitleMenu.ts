@@ -27,6 +27,7 @@ import {openDocHistory} from "../../history/doc";
 import {openNewWindowById} from "../../window/openNewWindow";
 import {genImportMenu} from "../../menus/navigation";
 import {transferBlockRef} from "../../menus/block";
+import {saveScroll} from "../scroll/saveScroll";
 
 export const openTitleMenu = (protyle: IProtyle, position: IPosition) => {
     hideTooltip();
@@ -183,7 +184,8 @@ export const openTitleMenu = (protyle: IProtyle, position: IPosition) => {
                     k: localData.k,
                     r: localData.r,
                     page: 1,
-                    types: Object.assign({}, localData.types)
+                    types: Object.assign({}, localData.types),
+                    replaceTypes: Object.assign({}, localData.replaceTypes)
                 });
                 /// #else
                 openSearch({
@@ -204,6 +206,7 @@ export const openTitleMenu = (protyle: IProtyle, position: IPosition) => {
             label: window.siyuan.languages.openByNewWindow,
             icon: "iconOpenWindow",
             click() {
+                saveScroll(protyle);
                 openNewWindowById(protyle.block.rootID);
             }
         }).element);

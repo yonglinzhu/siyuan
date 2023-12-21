@@ -29,7 +29,6 @@ import (
 	"github.com/88250/gulu"
 	"github.com/88250/lute/ast"
 	"github.com/88250/lute/parse"
-	"github.com/Masterminds/sprig/v3"
 	"github.com/siyuan-note/dejavu/entity"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
@@ -224,7 +223,7 @@ func RenderRepoSnapshotAttributeView(indexID, avID string) (viewable av.Viewable
 		}
 	}
 
-	viewable, err = renderAttributeView(attrView, "")
+	viewable, err = renderAttributeView(attrView, "", 1, -1)
 	return
 }
 
@@ -267,11 +266,11 @@ func RenderHistoryAttributeView(avID, created string) (viewable av.Viewable, att
 		}
 	}
 
-	viewable, err = renderAttributeView(attrView, "")
+	viewable, err = renderAttributeView(attrView, "", 1, -1)
 	return
 }
 
-func RenderAttributeView(avID, viewID string) (viewable av.Viewable, attrView *av.AttributeView, err error) {
+func RenderAttributeView(avID, viewID string, page, pageSize int) (viewable av.Viewable, attrView *av.AttributeView, err error) {
 	waitForSyncingStorages()
 
 	if avJSONPath := av.GetAttributeViewDataPath(avID); !filelock.IsExist(avJSONPath) {
@@ -288,11 +287,11 @@ func RenderAttributeView(avID, viewID string) (viewable av.Viewable, attrView *a
 		return
 	}
 
-	viewable, err = renderAttributeView(attrView, viewID)
+	viewable, err = renderAttributeView(attrView, viewID, page, pageSize)
 	return
 }
 
-func renderAttributeView(attrView *av.AttributeView, viewID string) (viewable av.Viewable, err error) {
+func renderAttributeView(attrView *av.AttributeView, viewID string, page, pageSize int) (viewable av.Viewable, err error) {
 	if 1 > len(attrView.Views) {
 		view, _ := av.NewTableViewWithBlockKey(ast.NewNodeID())
 		attrView.Views = append(attrView.Views, view)
@@ -378,6 +377,27 @@ func renderAttributeView(attrView *av.AttributeView, viewID string) (viewable av
 	viewable.FilterRows()
 	viewable.SortRows()
 	viewable.CalcCols()
+
+	// 分页
+	switch viewable.GetType() {
+	case av.LayoutTypeTable:
+		table := viewable.(*av.Table)
+		table.RowCount = len(table.Rows)
+		if 1 > view.Table.PageSize {
+			view.Table.PageSize = 50
+		}
+		table.PageSize = view.Table.PageSize
+		if 1 > pageSize {
+			pageSize = table.PageSize
+		}
+
+		start := (page - 1) * pageSize
+		end := start + pageSize
+		if len(table.Rows) < end {
+			end = len(table.Rows)
+		}
+		table.Rows = table.Rows[start:end]
+	}
 	return
 }
 
@@ -391,9 +411,9 @@ func renderTemplateCol(ial map[string]string, tplContent string, rowValues []*av
 		ial["updated"] = time.UnixMilli(block.Block.Updated).Format("20060102150405")
 	}
 
-	funcMap := sprig.TxtFuncMap()
 	goTpl := template.New("").Delims(".action{", "}")
-	tpl, tplErr := goTpl.Funcs(funcMap).Parse(tplContent)
+	goTpl = goTpl.Funcs(util.BuiltInTemplateFuncs())
+	tpl, tplErr := goTpl.Parse(tplContent)
 	if nil != tplErr {
 		logging.LogWarnf("parse template [%s] failed: %s", tplContent, tplErr)
 		return ""
@@ -429,6 +449,8 @@ func renderTemplateCol(ial map[string]string, tplContent string, rowValues []*av
 			v := rowValue.Values[0]
 			if av.KeyTypeNumber == v.Type {
 				dataModel[rowValue.Key.Name] = v.Number.Content
+			} else if av.KeyTypeDate == v.Type {
+				dataModel[rowValue.Key.Name] = time.UnixMilli(v.Date.Content)
 			} else {
 				dataModel[rowValue.Key.Name] = v.String()
 			}
@@ -567,7 +589,7 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 				keyValues := rows[row.ID]
 				ial := map[string]string{}
 				block := row.GetBlockValue()
-				if !block.IsDetached {
+				if nil != block && !block.IsDetached {
 					ial = GetBlockAttrsWithoutWaitWriting(row.ID)
 				}
 				content := renderTemplateCol(ial, cell.Value.Template.Content, keyValues)
@@ -584,12 +606,11 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 			case av.KeyTypeUpdated: // 渲染更新时间
 				ial := map[string]string{}
 				block := row.GetBlockValue()
-				if !block.IsDetached {
+				if nil != block && !block.IsDetached {
 					ial = GetBlockAttrsWithoutWaitWriting(row.ID)
 				}
 				updatedStr := ial["updated"]
-				if "" == updatedStr {
-					block := row.GetBlockValue()
+				if "" == updatedStr && nil != block {
 					cell.Value.Updated = av.NewFormattedValueUpdated(block.Block.Updated, 0, av.UpdatedFormatNone)
 					cell.Value.Updated.IsNotEmpty = true
 				} else {
@@ -763,6 +784,9 @@ func (tx *Transaction) doDuplicateAttrViewView(operation *Operation) (ret *TxErr
 		})
 	}
 
+	view.Table.PageSize = masterView.Table.PageSize
+	view.Table.RowIDs = masterView.Table.RowIDs
+
 	if err = av.SaveAttributeView(attrView); nil != err {
 		logging.LogErrorf("save attribute view [%s] failed: %s", avID, err)
 		return &TxErr{code: TxErrWriteAttributeView, msg: err.Error(), id: avID}
@@ -793,6 +817,8 @@ func (tx *Transaction) doAddAttrViewView(operation *Operation) (ret *TxErr) {
 	for _, col := range firstView.Table.Columns {
 		view.Table.Columns = append(view.Table.Columns, &av.ViewTableColumn{ID: col.ID})
 	}
+
+	view.Table.RowIDs = firstView.Table.RowIDs
 
 	if err = av.SaveAttributeView(attrView); nil != err {
 		logging.LogErrorf("save attribute view [%s] failed: %s", avID, err)
@@ -950,6 +976,34 @@ func setAttributeViewSorts(operation *Operation) (err error) {
 	return
 }
 
+func (tx *Transaction) doSetAttrViewPageSize(operation *Operation) (ret *TxErr) {
+	err := setAttributeViewPageSize(operation)
+	if nil != err {
+		return &TxErr{code: TxErrWriteAttributeView, id: operation.AvID, msg: err.Error()}
+	}
+	return
+}
+
+func setAttributeViewPageSize(operation *Operation) (err error) {
+	attrView, err := av.ParseAttributeView(operation.AvID)
+	if nil != err {
+		return
+	}
+
+	view, err := attrView.GetCurrentView()
+	if nil != err {
+		return
+	}
+
+	switch view.LayoutType {
+	case av.LayoutTypeTable:
+		view.Table.PageSize = int(operation.Data.(float64))
+	}
+
+	err = av.SaveAttributeView(attrView)
+	return
+}
+
 func (tx *Transaction) doSetAttrViewColCalc(operation *Operation) (ret *TxErr) {
 	err := setAttributeViewColumnCalc(operation)
 	if nil != err {
@@ -1035,11 +1089,6 @@ func addAttributeViewBlock(blockID string, operation *Operation, tree *parse.Tre
 		return
 	}
 
-	view, err := attrView.GetCurrentView()
-	if nil != err {
-		return
-	}
-
 	// 不允许重复添加相同的块到属性视图中
 	blockValues := attrView.GetBlockKeyValues()
 	for _, blockValue := range blockValues.Values {
@@ -1053,8 +1102,40 @@ func addAttributeViewBlock(blockID string, operation *Operation, tree *parse.Tre
 		content = getNodeRefText(node)
 	}
 	now := time.Now().UnixMilli()
-	value := &av.Value{ID: ast.NewNodeID(), KeyID: blockValues.Key.ID, BlockID: blockID, Type: av.KeyTypeBlock, IsDetached: operation.IsDetached, IsInitialized: false, Block: &av.ValueBlock{ID: blockID, Content: content, Created: now, Updated: now}}
-	blockValues.Values = append(blockValues.Values, value)
+	blockValue := &av.Value{ID: ast.NewNodeID(), KeyID: blockValues.Key.ID, BlockID: blockID, Type: av.KeyTypeBlock, IsDetached: operation.IsDetached, IsInitialized: false, Block: &av.ValueBlock{ID: blockID, Content: content, Created: now, Updated: now}}
+	blockValues.Values = append(blockValues.Values, blockValue)
+
+	// 如果存在过滤条件，则将过滤条件应用到新添加的块上
+	view, _ := attrView.GetCurrentView()
+	if nil != view && 0 < len(view.Table.Filters) {
+		viewable, _ := renderAttributeViewTable(attrView, view)
+		viewable.FilterRows()
+		viewable.SortRows()
+
+		if 0 < len(viewable.Rows) {
+			row := GetLastSortRow(viewable.Rows)
+			if nil != row {
+				for _, filter := range view.Table.Filters {
+					for _, cell := range row.Cells {
+						if nil != cell.Value && cell.Value.KeyID == filter.Column {
+							if av.KeyTypeBlock == cell.ValueType {
+								blockValue.Block.Content = cell.Value.Block.Content
+								continue
+							}
+
+							newValue := cell.Value.Clone()
+							newValue.ID = ast.NewNodeID()
+							newValue.BlockID = blockID
+							newValue.IsDetached = operation.IsDetached
+							newValue.IsInitialized = false
+							values, _ := attrView.GetKeyValues(filter.Column)
+							values.Values = append(values.Values, newValue)
+						}
+					}
+				}
+			}
+		}
+	}
 
 	if !operation.IsDetached {
 		attrs := parse.IAL2Map(node.KramdownIAL)
@@ -1073,22 +1154,40 @@ func addAttributeViewBlock(blockID string, operation *Operation, tree *parse.Tre
 		}
 	}
 
-	switch view.LayoutType {
-	case av.LayoutTypeTable:
-		if "" != operation.PreviousID {
-			for i, id := range view.Table.RowIDs {
-				if id == operation.PreviousID {
-					view.Table.RowIDs = append(view.Table.RowIDs[:i+1], append([]string{blockID}, view.Table.RowIDs[i+1:]...)...)
-					break
+	for _, view := range attrView.Views {
+		switch view.LayoutType {
+		case av.LayoutTypeTable:
+			if "" != operation.PreviousID {
+				changed := false
+				for i, id := range view.Table.RowIDs {
+					if id == operation.PreviousID {
+						view.Table.RowIDs = append(view.Table.RowIDs[:i+1], append([]string{blockID}, view.Table.RowIDs[i+1:]...)...)
+						changed = true
+						break
+					}
 				}
+				if !changed {
+					view.Table.RowIDs = append(view.Table.RowIDs, blockID)
+				}
+			} else {
+				view.Table.RowIDs = append([]string{blockID}, view.Table.RowIDs...)
 			}
-		} else {
-			view.Table.RowIDs = append([]string{blockID}, view.Table.RowIDs...)
 		}
 	}
 
 	err = av.SaveAttributeView(attrView)
 	return
+}
+
+func GetLastSortRow(rows []*av.TableRow) *av.TableRow {
+	for i := len(rows) - 1; i >= 0; i-- {
+		row := rows[i]
+		block := row.GetBlockValue()
+		if nil != block && !block.NotAffectFilter() {
+			return row
+		}
+	}
+	return nil
 }
 
 func (tx *Transaction) doRemoveAttrViewBlock(operation *Operation) (ret *TxErr) {
@@ -1101,11 +1200,6 @@ func (tx *Transaction) doRemoveAttrViewBlock(operation *Operation) (ret *TxErr) 
 
 func (tx *Transaction) removeAttributeViewBlock(operation *Operation) (err error) {
 	attrView, err := av.ParseAttributeView(operation.AvID)
-	if nil != err {
-		return
-	}
-
-	view, err := attrView.GetCurrentView()
 	if nil != err {
 		return
 	}
@@ -1156,8 +1250,10 @@ func (tx *Transaction) removeAttributeViewBlock(operation *Operation) (err error
 		keyValues.Values = tmp
 	}
 
-	for _, blockID := range operation.SrcIDs {
-		view.Table.RowIDs = gulu.Str.RemoveElem(view.Table.RowIDs, blockID)
+	for _, view := range attrView.Views {
+		for _, blockID := range operation.SrcIDs {
+			view.Table.RowIDs = gulu.Str.RemoveElem(view.Table.RowIDs, blockID)
+		}
 	}
 
 	err = av.SaveAttributeView(attrView)
@@ -1350,7 +1446,9 @@ func sortAttributeViewRow(operation *Operation) (err error) {
 		}
 	}
 	if "" == rowID {
-		return
+		rowID = operation.ID
+		view.Table.RowIDs = append(view.Table.RowIDs, rowID)
+		index = len(view.Table.RowIDs) - 1
 	}
 
 	switch view.LayoutType {
@@ -1433,7 +1531,9 @@ func addAttributeViewColumn(operation *Operation) (err error) {
 
 	keyType := av.KeyType(operation.Typ)
 	switch keyType {
-	case av.KeyTypeText, av.KeyTypeNumber, av.KeyTypeDate, av.KeyTypeSelect, av.KeyTypeMSelect, av.KeyTypeURL, av.KeyTypeEmail, av.KeyTypePhone, av.KeyTypeMAsset, av.KeyTypeTemplate, av.KeyTypeCreated, av.KeyTypeUpdated, av.KeyTypeCheckbox:
+	case av.KeyTypeText, av.KeyTypeNumber, av.KeyTypeDate, av.KeyTypeSelect, av.KeyTypeMSelect, av.KeyTypeURL, av.KeyTypeEmail,
+		av.KeyTypePhone, av.KeyTypeMAsset, av.KeyTypeTemplate, av.KeyTypeCreated, av.KeyTypeUpdated, av.KeyTypeCheckbox,
+		av.KeyTypeRelation, av.KeyTypeRollup:
 		var icon string
 		if nil != operation.Data {
 			icon = operation.Data.(string)
@@ -1527,7 +1627,9 @@ func updateAttributeViewColumn(operation *Operation) (err error) {
 
 	colType := av.KeyType(operation.Typ)
 	switch colType {
-	case av.KeyTypeBlock, av.KeyTypeText, av.KeyTypeNumber, av.KeyTypeDate, av.KeyTypeSelect, av.KeyTypeMSelect, av.KeyTypeURL, av.KeyTypeEmail, av.KeyTypePhone, av.KeyTypeMAsset, av.KeyTypeTemplate, av.KeyTypeCreated, av.KeyTypeUpdated, av.KeyTypeCheckbox:
+	case av.KeyTypeBlock, av.KeyTypeText, av.KeyTypeNumber, av.KeyTypeDate, av.KeyTypeSelect, av.KeyTypeMSelect, av.KeyTypeURL, av.KeyTypeEmail,
+		av.KeyTypePhone, av.KeyTypeMAsset, av.KeyTypeTemplate, av.KeyTypeCreated, av.KeyTypeUpdated, av.KeyTypeCheckbox,
+		av.KeyTypeRelation, av.KeyTypeRollup:
 		for _, keyValues := range attrView.KeyValues {
 			if keyValues.Key.ID == operation.ID {
 				keyValues.Key.Name = strings.TrimSpace(operation.Name)
@@ -1600,6 +1702,11 @@ func replaceAttributeViewBlock(operation *Operation, tx *Transaction) (err error
 	for _, keyValues := range attrView.KeyValues {
 		for _, value := range keyValues.Values {
 			if value.BlockID == operation.PreviousID {
+				if value.BlockID != operation.NextID {
+					// 换绑
+					unbindBlockAv(tx, operation.AvID, value.BlockID)
+				}
+
 				value.BlockID = operation.NextID
 				if nil != value.Block {
 					value.Block.ID = operation.NextID
@@ -1616,19 +1723,20 @@ func replaceAttributeViewBlock(operation *Operation, tx *Transaction) (err error
 		}
 	}
 
+	replacedRowID := false
 	for _, v := range attrView.Views {
 		switch v.LayoutType {
 		case av.LayoutTypeTable:
-			for _, rowID := range v.Table.RowIDs {
-				if rowID == operation.NextID {
-					return
-				}
-			}
-
 			for i, rowID := range v.Table.RowIDs {
 				if rowID == operation.PreviousID {
 					v.Table.RowIDs[i] = operation.NextID
+					replacedRowID = true
+					break
 				}
+			}
+
+			if !replacedRowID {
+				v.Table.RowIDs = append(v.Table.RowIDs, operation.NextID)
 			}
 		}
 	}
@@ -1656,7 +1764,24 @@ func UpdateAttributeViewCell(tx *Transaction, avID, keyID, rowID, cellID string,
 		return
 	}
 
+	var blockVal *av.Value
+	for _, kv := range attrView.KeyValues {
+		if av.KeyTypeBlock == kv.Key.Type {
+			for _, v := range kv.Values {
+				if rowID == v.Block.ID {
+					blockVal = v
+					break
+				}
+			}
+			break
+		}
+	}
+
 	var val *av.Value
+	oldIsDetached := true
+	if nil != blockVal {
+		oldIsDetached = blockVal.IsDetached
+	}
 	for _, keyValues := range attrView.KeyValues {
 		if keyID != keyValues.Key.ID {
 			continue
@@ -1677,8 +1802,8 @@ func UpdateAttributeViewCell(tx *Transaction, avID, keyID, rowID, cellID string,
 		break
 	}
 
-	oldIsDetached := val.IsDetached
-
+	isUpdatingBlockKey := av.KeyTypeBlock == val.Type
+	oldBoundBlockID := val.BlockID
 	data, err := gulu.JSON.MarshalJSON(valueData)
 	if nil != err {
 		return
@@ -1687,25 +1812,73 @@ func UpdateAttributeViewCell(tx *Transaction, avID, keyID, rowID, cellID string,
 		return
 	}
 
-	if oldIsDetached && !val.IsDetached {
-		// 将游离行绑定到新建的块上
-		bindBlockAv(tx, avID, rowID)
-	}
+	// val.IsDetached 只有更新主键的时候才会传入，所以下面需要结合 isUpdatingBlockKey 来判断
 
-	for _, kv := range attrView.KeyValues {
-		if av.KeyTypeBlock == kv.Key.Type {
-			for _, v := range kv.Values {
-				if rowID == v.Block.ID {
-					v.Block.Updated = time.Now().UnixMilli()
-					v.IsInitialized = true
-					break
+	if oldIsDetached { // 之前是游离行
+		if !val.IsDetached { // 现在绑定了块
+			// 将游离行绑定到新建的块上
+			bindBlockAv(tx, avID, rowID)
+		}
+	} else { // 之前绑定了块
+		if isUpdatingBlockKey { // 正在更新主键
+			if val.IsDetached { // 现在是游离行
+				// 将绑定的块从属性视图中移除
+				unbindBlockAv(tx, avID, rowID)
+			} else { // 现在绑定了块
+				if oldBoundBlockID != val.BlockID { // 之前绑定的块和现在绑定的块不一样
+					// 换绑块
+					unbindBlockAv(tx, avID, oldBoundBlockID)
+					bindBlockAv(tx, avID, val.BlockID)
+				} else { // 之前绑定的块和现在绑定的块一样
+					// 直接返回，因为锚文本不允许更改
+					return
 				}
 			}
-			break
+		}
+	}
+
+	if nil != blockVal {
+		blockVal.Block.Updated = time.Now().UnixMilli()
+		blockVal.IsInitialized = true
+		if isUpdatingBlockKey {
+			blockVal.IsDetached = val.IsDetached
 		}
 	}
 
 	if err = av.SaveAttributeView(attrView); nil != err {
+		return
+	}
+	return
+}
+
+func unbindBlockAv(tx *Transaction, avID, blockID string) {
+	node, tree, err := getNodeByBlockID(tx, blockID)
+	if nil != err {
+		return
+	}
+
+	attrs := parse.IAL2Map(node.KramdownIAL)
+	if "" == attrs[av.NodeAttrNameAvs] {
+		return
+	}
+
+	avIDs := strings.Split(attrs[av.NodeAttrNameAvs], ",")
+	avIDs = gulu.Str.RemoveElem(avIDs, avID)
+	if 0 == len(avIDs) {
+		delete(attrs, av.NodeAttrNameAvs)
+		node.RemoveIALAttr(av.NodeAttrNameAvs)
+	} else {
+		attrs[av.NodeAttrNameAvs] = strings.Join(avIDs, ",")
+		node.SetIALAttr(av.NodeAttrNameAvs, strings.Join(avIDs, ","))
+	}
+
+	if nil != tx {
+		err = setNodeAttrsWithTx(tx, node, tree, attrs)
+	} else {
+		err = setNodeAttrs(node, tree, attrs)
+	}
+	if nil != err {
+		logging.LogWarnf("set node [%s] attrs failed: %s", blockID, err)
 		return
 	}
 	return
@@ -1722,10 +1895,6 @@ func bindBlockAv(tx *Transaction, avID, blockID string) {
 		attrs[av.NodeAttrNameAvs] = avID
 	} else {
 		avIDs := strings.Split(attrs[av.NodeAttrNameAvs], ",")
-		if gulu.Str.Contains(avID, avIDs) {
-			return
-		}
-
 		avIDs = append(avIDs, avID)
 		avIDs = gulu.Str.RemoveDuplicatedElem(avIDs)
 		attrs[av.NodeAttrNameAvs] = strings.Join(avIDs, ",")

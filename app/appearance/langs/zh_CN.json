@@ -1,4 +1,31 @@
 {
+  "replaceTypes": {
+    "text": "普通文本",
+    "imgText": "图片提示文本",
+    "imgTitle": "图片标题",
+    "imgSrc": "图片链接",
+    "aText": "链接锚文本",
+    "aTitle": "链接标题",
+    "aHref": "链接地址",
+    "code": "行级代码",
+    "em": "斜体",
+    "strong": "粗体",
+    "inlineMath": "行级公式",
+    "inlineMemo": "行级备注",
+    "kbd": "键盘",
+    "mark": "高亮",
+    "s": "删除",
+    "sub": "下标",
+    "sup": "上标",
+    "tag": "标签",
+    "u": "下划线",
+    "docTitle": "文档标题",
+    "codeBlock": "代码块",
+    "mathBlock": "公式块",
+    "htmlBlock": "HTML 块"
+  },
+  "selected": "已选中",
+  "loadMore": "加载更多",
   "tempUnlock": "临时解锁",
   "cancelTempUnlock": "取消临时解锁",
   "addFilter": "添加筛选条件",
@@ -443,6 +470,7 @@
   "cancelMerged": "拆分单元格",
   "useDefaultWidth": "使用默认列宽",
   "type": "类型",
+  "replaceType": "替换类型",
   "searchBlockType": "块级类型（在以下启用的类型中进行搜索，全局搜索中的过滤选项会覆盖该设置）",
   "searchBlockAttr": "块级属性（不仅在内容中进行搜索，同时也会在以下启用的属性中搜索）",
   "searchIndex": "索引",
@@ -450,6 +478,7 @@
   "searchBackmention": "反链提及（反链提及搜索关键字从以下方式获得）",
   "searchVirtualRef": "虚拟引用（虚拟引用搜索关键字从以下方式获得）",
   "netImg2LocalAsset": "网络图片转换为本地图片",
+  "netAssets2LocalAssets": "网络资源文件转换本地",
   "releaseDate": "发布日期",
   "pkgSize": "包大小",
   "installSize": "安装大小",
@@ -1115,6 +1144,10 @@
     "resetWindow": "重置窗口并退出程序",
     "quit": "退出程序"
   },
+  "_attrView": {
+    "table": "表格",
+    "key": "主键"
+  },
   "_kernel": {
     "0": "查询笔记本失败",
     "1": "文件名重复",
@@ -1335,6 +1368,7 @@
     "216": "正在重建资源文件内容数据索引，请稍等...",
     "217": "[%d/%d] 已经创建资源文件内容数据索引",
     "218": "检测到数据仓库快照过多，降低了程序启动和数据同步速度，请考虑执行 [设置 - 关于 - 数据仓库清理]",
-    "219": "云端存储服务不可用，请稍后再试"
+    "219": "云端存储服务不可用，请稍后再试",
+    "220": "由于之前版本的缺陷导致了云端数据损坏，请参考 用户指南-常见问题-遗失密钥 步骤来重置本地数据仓库和云端目录"
   }
 }

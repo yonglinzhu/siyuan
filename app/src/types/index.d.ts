@@ -48,6 +48,7 @@ type TOperation =
     | "setAttrViewViewIcon"
     | "duplicateAttrViewView"
     | "sortAttrViewView"
+    | "setAttrViewPageSize"
 type TBazaarType = "templates" | "icons" | "widgets" | "themes" | "plugins"
 type TCardType = "doc" | "notebook" | "all"
 type TEventBus = "ws-main" | "sync-start" | "sync-end" | "sync-fail" |
@@ -263,7 +264,10 @@ interface ISearchOption {
         htmlBlock: boolean
         embedBlock: boolean
         databaseBlock: boolean
-    }
+    },
+    replaceTypes: {
+        [key: string]: boolean;
+    },
 }
 
 interface ITextOption {
@@ -672,6 +676,10 @@ interface IAccount {
 }
 
 interface IConfig {
+    snippet: {
+        enabledCSS: boolean
+        enabledJS: boolean
+    }
     cloudRegion: number
     bazaar: {
         trust: boolean
@@ -1038,6 +1046,8 @@ interface IAVTable extends IAVView {
     filters: IAVFilter[],
     sorts: IAVSort[],
     rows: IAVRow[],
+    rowCount: number,
+    pageSize: number,
 }
 
 interface IAVFilter {
@@ -1088,7 +1098,7 @@ interface IAVCell {
 
 interface IAVCellValue {
     id?: string,
-    type?: TAVCol,
+    type: TAVCol,
     isDetached?: boolean,
     text?: {
         content: string

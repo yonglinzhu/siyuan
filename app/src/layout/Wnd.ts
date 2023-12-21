@@ -3,7 +3,7 @@ import {genUUID} from "../util/genID";
 import {
     getInstanceById,
     getWndByLayout, JSONToCenter,
-    newModelByInitData, pdfIsLoading,
+    newModelByInitData, pdfIsLoading, saveLayout,
     setPanelFocus,
     switchWnd
 } from "./util";
@@ -279,6 +279,7 @@ export class Wnd {
             } else {
                 oldTab.parent.children.push(tempTab);
             }
+            saveLayout();
         });
 
         this.element.addEventListener("dragenter", (event: DragEvent & { target: HTMLElement }) => {
@@ -430,6 +431,7 @@ export class Wnd {
             if (initData) {
                 currentTab.addModel(newModelByInitData(this.app, currentTab, JSON.parse(initData)));
                 currentTab.headElement.removeAttribute("data-initdata");
+                saveLayout();
                 return;
             }
         }
@@ -466,7 +468,7 @@ export class Wnd {
                     openFileById({
                         app: this.app,
                         id: keepCursorId,
-                        action: [Constants.CB_GET_FOCUS, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL]
+                        action: [Constants.CB_GET_FOCUS, Constants.CB_GET_SCROLL]
                     });
                 }
                 currentTab.headElement.removeAttribute("keep-cursor");
@@ -490,9 +492,10 @@ export class Wnd {
                 resize,
             });
         }
+        saveLayout();
     }
 
-    public addTab(tab: Tab, keepCursor = false) {
+    public addTab(tab: Tab, keepCursor = false, isSaveLayout = true) {
         if (keepCursor) {
             tab.headElement?.classList.remove("item--focus");
             tab.panelElement.classList.add("fn__none");
@@ -560,6 +563,9 @@ export class Wnd {
         setTabPosition();
         setModelsHash();
         /// #endif
+        if (isSaveLayout) {
+            saveLayout();
+        }
     }
 
     private renderTabList(target: HTMLElement) {
@@ -682,7 +688,7 @@ export class Wnd {
         model.send("closews", {});
     }
 
-    private removeTabAction = (id: string, closeAll = false, hasSaveScroll = true, animate = true) => {
+    private removeTabAction = (id: string, closeAll = false, animate = true) => {
         clearCounter();
         this.children.find((item, index) => {
             if (item.id === id) {
@@ -691,7 +697,7 @@ export class Wnd {
                         item.model.beforeDestroy();
                     }
                 }
-                if (item.model instanceof Editor && hasSaveScroll) {
+                if (item.model instanceof Editor) {
                     saveScroll(item.model.editor.protyle);
                 }
                 if (this.children.length === 1) {
@@ -760,7 +766,7 @@ export class Wnd {
                 item.panelElement.remove();
                 this.destroyModel(item.model);
                 this.children.splice(index, 1);
-                resizeTabs();
+                resizeTabs(item.headElement ? true : false);
                 return true;
             }
         });
@@ -776,7 +782,7 @@ export class Wnd {
                 /// #endif
                 const wnd = new Wnd(this.app);
                 window.siyuan.layout.centerLayout.addWnd(wnd);
-                wnd.addTab(newCenterEmptyTab(this.app));
+                wnd.addTab(newCenterEmptyTab(this.app), false, false);
                 setTitle(window.siyuan.languages.siyuanNote);
             }
         }
@@ -787,7 +793,7 @@ export class Wnd {
         /// #endif
     };
 
-    public removeTab(id: string, closeAll = false, needSaveScroll = true, animate = true) {
+    public removeTab(id: string, closeAll = false, animate = true) {
         for (let index = 0; index < this.children.length; index++) {
             const item = this.children[index];
             if (item.id === id) {
@@ -796,9 +802,9 @@ export class Wnd {
                         showMessage(window.siyuan.languages.uploading);
                         return;
                     }
-                    this.removeTabAction(id, closeAll, needSaveScroll, animate);
+                    this.removeTabAction(id, closeAll, animate);
                 } else {
-                    this.removeTabAction(id, closeAll, needSaveScroll, animate);
+                    this.removeTabAction(id, closeAll, animate);
                 }
                 return;
             }
