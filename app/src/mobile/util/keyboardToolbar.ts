@@ -12,6 +12,7 @@ import {getCurrentEditor} from "../editor";
 import {fontEvent, getFontNodeElements} from "../../protyle/toolbar/Font";
 import {hideElements} from "../../protyle/ui/hideElements";
 import {softEnter} from "../../protyle/wysiwyg/enter";
+import {isPaidUser} from "../../util/needSubscribe";
 
 let renderKeyboardToolbarTimeout: number;
 let showUtil = false;
@@ -203,6 +204,7 @@ const renderSlashMenu = (protyle: IProtyle, toolbarElement: Element) => {
     ${getSlashItem("((", "iconRef", window.siyuan.languages.ref, "true")}
     ${getSlashItem("{{", "iconSQL", window.siyuan.languages.blockEmbed, "true")}
     ${getSlashItem(Constants.ZWSP + 5, "iconSparkles", "AI Chat")}
+    ${isPaidUser() ? getSlashItem('<div data-type="NodeAttributeView" data-av-type="table"></div>', "iconDatabase", window.siyuan.languages.database, "true") : ""}
     ${getSlashItem(Constants.ZWSP + 4, "iconFile", window.siyuan.languages.newSubDoc)}
 </div>
 <div class="keyboard__slash-title"></div>
@@ -273,7 +275,7 @@ export const showKeyboardToolbarUtil = (oldScrollTop: number) => {
 
     const toolbarElement = document.getElementById("keyboardToolbar");
     let keyboardHeight = toolbarElement.getAttribute("data-keyboardheight");
-    keyboardHeight = (keyboardHeight ? (parseInt(keyboardHeight) + 42) : window.innerHeight / 2) + "px";
+    keyboardHeight = (keyboardHeight ? (parseInt(keyboardHeight) + 42) : window.outerHeight / 2) + "px";
     const editor = getCurrentEditor();
     if (editor) {
         editor.protyle.element.parentElement.style.paddingBottom = keyboardHeight;
@@ -415,12 +417,13 @@ export const showKeyboardToolbar = () => {
     setTimeout(() => {
         const contentElement = hasClosestByClassName(range.startContainer, "protyle-content", true);
         if (contentElement) {
-            const cursorTop = getSelectionPosition(contentElement).top - contentElement.getBoundingClientRect().top;
-            if (cursorTop < window.innerHeight - 118.5) {   // 118: contentElement.getBoundingClientRect().top + toolbarElement.clientHeight
+            const contentTop = contentElement.getBoundingClientRect().top;
+            const cursorTop = getSelectionPosition(contentElement).top;
+            if (cursorTop < window.innerHeight - 42 && cursorTop > contentTop) {
                 return;
             }
             contentElement.scroll({
-                top: contentElement.scrollTop + cursorTop - ((window.outerHeight - 118.5) / 2 - 26),
+                top: contentElement.scrollTop + cursorTop - window.innerHeight + 42 + 26,
                 left: contentElement.scrollLeft,
                 behavior: "smooth"
             });

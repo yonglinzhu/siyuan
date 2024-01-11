@@ -205,7 +205,7 @@ export const saveLayout = () => {
         saveCount++;
         setTimeout(() => {
             saveLayout();
-        }, Constants.TIMEOUT_LOAD);
+        }, Constants.TIMEOUT_LOAD * saveCount);
     } else {
         saveCount = 0;
         if (isWindow()) {
@@ -220,25 +220,19 @@ export const saveLayout = () => {
 };
 
 export const exportLayout = (options: {
-    reload: boolean,
-    cb?: () => void,
-    onlyData: boolean,
-    errorExit: boolean,
+    cb: () => void,
+    errorExit: boolean
 }) => {
     if (isWindow()) {
         const layoutJSON: any = {
             layout: {},
         };
         layoutToJSON(window.siyuan.layout.layout, layoutJSON.layout);
-        if (options.onlyData) {
-            return layoutJSON;
-        }
+        getAllModels().editor.forEach(item => {
+            saveScroll(item.editor.protyle);
+        });
         sessionStorage.setItem("layout", JSON.stringify(layoutJSON));
-        if (options.reload) {
-            window.location.reload();
-        } else if (options.cb) {
-            options.cb();
-        }
+        options.cb();
         return;
     }
     const useElement = document.querySelector("#barDock use");
@@ -253,19 +247,27 @@ export const exportLayout = (options: {
         right: dockToJSON(window.siyuan.layout.rightDock),
     };
     layoutToJSON(window.siyuan.layout.layout, layoutJSON.layout);
-    if (options.onlyData) {
-        return layoutJSON;
-    }
+    getAllModels().editor.forEach(item => {
+        saveScroll(item.editor.protyle);
+    });
     fetchPost("/api/system/setUILayout", {
         layout: layoutJSON,
         errorExit: options.errorExit    // 后台不接受该参数，用于请求发生错误时退出程序
     }, () => {
-        if (options.reload) {
-            window.location.reload();
-        } else if (options.cb) {
-            options.cb();
-        }
+        options.cb();
     });
+};
+
+export const getAllLayout = () => {
+    const layoutJSON: any = {
+        hideDock: document.querySelector("#barDock use").getAttribute("xlink:href") === "#iconDock",
+        layout: {},
+        bottom: dockToJSON(window.siyuan.layout.bottomDock),
+        left: dockToJSON(window.siyuan.layout.leftDock),
+        right: dockToJSON(window.siyuan.layout.rightDock),
+    };
+    layoutToJSON(window.siyuan.layout.layout, layoutJSON.layout);
+    return layoutJSON;
 };
 
 const initInternalDock = (dockItem: IDockTab[]) => {
@@ -537,7 +539,6 @@ export const layoutToJSON = (layout: Layout | Wnd | Tab | Model, json: any, brea
         json.mode = layout.editor.protyle.preview.element.classList.contains("fn__none") ? "wysiwyg" : "preview";
         json.action = layout.editor.protyle.block.showAll ? Constants.CB_GET_ALL : Constants.CB_GET_SCROLL;
         json.instance = "Editor";
-        saveScroll(layout.editor.protyle);
     } else if (layout instanceof Asset) {
         json.path = layout.path;
         if (layout.pdfObject) {
@@ -840,6 +841,7 @@ export const addResize = (obj: Layout | Wnd) => {
                 documentSelf.ondragstart = null;
                 documentSelf.onselectstart = null;
                 documentSelf.onselect = null;
+                adjustLayout(isWindow() ? window.siyuan.layout.centerLayout : undefined);
                 resizeTabs();
                 if (!isWindow()) {
                     window.siyuan.layout.leftDock.setSize();
@@ -862,4 +864,38 @@ export const addResize = (obj: Layout | Wnd) => {
     resizeElement.classList.add("layout__resize");
     obj.element.insertAdjacentElement("beforebegin", resizeElement);
     resizeWnd(resizeElement, obj.resize);
+};
+
+export const adjustLayout = (layout: Layout = window.siyuan.layout.centerLayout.parent) => {
+    layout.children.forEach((item: Layout | Wnd) => {
+        item.element.style.maxWidth = "";
+        if (!item.element.style.width && !item.element.classList.contains("layout__center")) {
+            item.element.style.minWidth = "8px";
+        } else {
+            item.element.style.minWidth = "";
+        }
+    });
+    let lastItem: HTMLElement;
+    let index = Math.floor(window.innerWidth / 24);
+    // +2 由于某些分辨率下 scrollWidth 会大于 clientWidth
+    while (layout.element.scrollWidth > layout.element.clientWidth + 2 && index > 0) {
+        layout.children.find((item: Layout | Wnd) => {
+            if (item.element.style.width && item.element.style.width !== "0px") {
+                item.element.style.maxWidth = Math.max(Math.min(item.element.clientWidth, window.innerWidth) - 8, 64) + "px";
+                lastItem = item.element;
+            }
+            if (layout.element.scrollWidth <= layout.element.clientWidth + 2) {
+                return true;
+            }
+        });
+        index--;
+    }
+    if (lastItem) {
+        lastItem.style.maxWidth = Math.max(Math.min(lastItem.clientWidth, window.innerWidth) - 8, 64) + "px";
+    }
+    layout.children.forEach((item: Layout | Wnd) => {
+        if (item instanceof Layout && item.size !== "0px") {
+            adjustLayout(item);
+        }
+    });
 };

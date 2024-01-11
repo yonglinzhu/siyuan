@@ -232,6 +232,12 @@ func ParseAttributeView(avID string) (ret *AttributeView, err error) {
 }
 
 func SaveAttributeView(av *AttributeView) (err error) {
+	if "" == av.ID {
+		err = errors.New("av id is empty")
+		logging.LogErrorf("save attribute view failed: %s", err)
+		return
+	}
+
 	// 做一些数据兼容和订正处理
 	now := util.CurrentTimeMillis()
 	for _, kv := range av.KeyValues {
@@ -267,6 +273,30 @@ func SaveAttributeView(av *AttributeView) (err error) {
 				}
 			}
 		}
+
+		for _, v := range kv.Values {
+			if "" == kv.Key.ID {
+				kv.Key.ID = ast.NewNodeID()
+				for _, val := range kv.Values {
+					val.KeyID = kv.Key.ID
+				}
+				if "" == v.KeyID {
+					v.KeyID = kv.Key.ID
+				}
+
+				for _, view := range av.Views {
+					switch view.LayoutType {
+					case LayoutTypeTable:
+						for _, column := range view.Table.Columns {
+							if "" == column.ID {
+								column.ID = kv.Key.ID
+								break
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	// 数据订正
@@ -281,7 +311,7 @@ func SaveAttributeView(av *AttributeView) (err error) {
 		}
 	}
 
-	data, err := gulu.JSON.MarshalIndentJSON(av, "", "\t") // TODO: single-line for production
+	data, err := gulu.JSON.MarshalJSON(av)
 	if nil != err {
 		logging.LogErrorf("marshal attribute view [%s] failed: %s", av.ID, err)
 		return
@@ -399,14 +429,9 @@ func (av *AttributeView) ShallowClone() (ret *AttributeView) {
 	}
 
 	ret.ID = ast.NewNodeID()
-	view, err := ret.GetCurrentView()
-	if nil == err {
-		view.ID = ast.NewNodeID()
-		ret.ViewID = view.ID
-	} else {
-		view, _ = NewTableViewWithBlockKey(ast.NewNodeID())
-		ret.ViewID = view.ID
-		ret.Views = append(ret.Views, view)
+	if 1 > len(ret.Views) {
+		logging.LogErrorf("attribute view [%s] has no views", av.ID)
+		return nil
 	}
 
 	keyIDMap := map[string]string{}
@@ -417,11 +442,22 @@ func (av *AttributeView) ShallowClone() (ret *AttributeView) {
 		kv.Values = []*Value{}
 	}
 
-	view.Table.ID = ast.NewNodeID()
-	for _, column := range view.Table.Columns {
-		column.ID = keyIDMap[column.ID]
+	for _, view := range ret.Views {
+		view.ID = ast.NewNodeID()
+		view.Table.ID = ast.NewNodeID()
+		for _, column := range view.Table.Columns {
+			column.ID = keyIDMap[column.ID]
+		}
+		view.Table.RowIDs = []string{}
+
+		for _, f := range view.Table.Filters {
+			f.Column = keyIDMap[f.Column]
+		}
+		for _, s := range view.Table.Sorts {
+			s.Column = keyIDMap[s.Column]
+		}
 	}
-	view.Table.RowIDs = []string{}
+	ret.ViewID = ret.Views[0].ID
 	return
 }
 

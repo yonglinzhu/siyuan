@@ -295,21 +295,21 @@ export const genSearch = (app: App, config: ISearchOption, element: Element, clo
             <input id="searchInput" class="b3-text-field b3-text-field--text" placeholder="${window.siyuan.languages.showRecentUpdatedBlocks}">
         </div>
         <div class="block__icons">
-            <span id="searchRefresh" aria-label="${window.siyuan.languages.refresh}" class="block__icon ariaLabel" data-position="9bottom">
-                <svg><use xlink:href="#iconRefresh"></use></svg>
+            <span id="searchFilter" aria-label="${window.siyuan.languages.replaceType}" class="block__icon ariaLabel" data-position="9bottom">
+                <svg><use xlink:href="#iconFilter"></use></svg>
+            </span> 
+            <span class="fn__space"></span>
+            <span id="searchSyntaxCheck" aria-label="${window.siyuan.languages.searchMethod} ${methodText}" class="block__icon ariaLabel" data-position="9bottom">
+                <svg><use xlink:href="#iconRegex"></use></svg>
             </span>
             <span class="fn__space"></span>
             <span id="searchReplace" aria-label="${window.siyuan.languages.replace}" class="block__icon ariaLabel" data-position="9bottom">
                 <svg><use xlink:href="#iconReplace"></use></svg>
             </span>
             <span class="fn__space"></span>
-            <span id="searchSyntaxCheck" aria-label="${window.siyuan.languages.searchMethod} ${methodText}" class="block__icon ariaLabel" data-position="9bottom">
-                <svg><use xlink:href="#iconRegex"></use></svg>
+            <span id="searchRefresh" aria-label="${window.siyuan.languages.refresh}" class="block__icon ariaLabel" data-position="9bottom">
+                <svg><use xlink:href="#iconRefresh"></use></svg>
             </span>
-            <span class="fn__space"></span>
-            <span id="searchFilter" aria-label="${window.siyuan.languages.type}" class="block__icon ariaLabel" data-position="9bottom">
-                <svg><use xlink:href="#iconFilter"></use></svg>
-            </span> 
             <div class="fn__flex${config.group === 0 ? " fn__none" : ""}">
                 <span class="fn__space"></span>
                 <span id="searchExpand" class="block__icon block__icon--show ariaLabel" data-position="9bottom" aria-label="${window.siyuan.languages.expand}">
@@ -332,13 +332,13 @@ export const genSearch = (app: App, config: ISearchOption, element: Element, clo
         </div>
         <div class="fn__space"></div>
         <svg class="fn__rotate fn__none svg" style="padding: 0 8px;align-self: center;margin-right: 8px"><use xlink:href="#iconRefresh"></use></svg>
-        <span id="replaceFilter" aria-label="${window.siyuan.languages.type}" class="block__icon ariaLabel fn__flex-center" data-position="9bottom">
+        <span id="replaceFilter" aria-label="${window.siyuan.languages.replaceType}" class="block__icon ariaLabel fn__flex-center" data-position="9bottom">
             <svg><use xlink:href="#iconFilter"></use></svg>
         </span>
         <span class="fn__space"></span>
-        <button id="replaceBtn" class="b3-button b3-button--small b3-button--outline fn__flex-center">↵ ${window.siyuan.languages.replace}</button>
-        <div class="fn__space"></div>
         <button id="replaceAllBtn" class="b3-button b3-button--small b3-button--outline fn__flex-center">${window.siyuan.languages.replaceAll}</button>
+        <div class="fn__space"></div>
+        <button id="replaceBtn" class="b3-button b3-button--small b3-button--outline fn__flex-center">↵ ${window.siyuan.languages.replace}</button>
         <div class="fn__space"></div>
     </div>
     <div id="criteria" class="search__header"></div>

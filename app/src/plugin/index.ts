@@ -56,6 +56,7 @@ export class Plugin {
             /// #endif
         }
     } = {};
+    private protyleOptionsValue: IOptions;
 
     constructor(options: {
         app: App,
@@ -65,9 +66,14 @@ export class Plugin {
     }) {
         this.app = options.app;
         this.i18n = options.i18n;
-        this.name = options.name;
         this.displayName = options.displayName;
         this.eventBus = new EventBus(options.name);
+
+        // https://github.com/siyuan-note/siyuan/issues/9943
+        Object.defineProperty(this, "name", {
+            value: options.name,
+            writable: false,
+        });
     }
 
     public onload() {
@@ -75,7 +81,15 @@ export class Plugin {
     }
 
     public onunload() {
-        // 禁用/卸载
+        // 禁用/关闭
+    }
+
+    public uninstall() {
+        // 卸载
+    }
+
+    public async updateCards(options: ICardData) {
+        return options;
     }
 
     public onLayoutReady() {
@@ -304,4 +318,12 @@ export class Plugin {
             defIds: options.defIds,
         }));
     };
+
+    set protyleOptions(options: IOptions) {
+        this.protyleOptionsValue = options;
+    }
+
+    get protyleOptions() {
+        return this.protyleOptionsValue;
+    }
 }
