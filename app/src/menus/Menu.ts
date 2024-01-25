@@ -212,7 +212,7 @@ export class MenuItem {
         if (options.element) {
             this.element.append(options.element);
         } else {
-            let html = `<span class="b3-menu__label">${options.label}</span>`;
+            let html = `<span class="b3-menu__label">${options.label || "&nbsp;"}</span>`;
             if (typeof options.iconHTML === "string") {
                 html = options.iconHTML + html;
             } else {
@@ -222,7 +222,7 @@ export class MenuItem {
                 html += `<span class="b3-menu__accelerator">${updateHotkeyTip(options.accelerator)}</span>`;
             }
             if (options.action) {
-                html += `<svg class="b3-menu__action"><use xlink:href="#${options.action}"></use></svg>`;
+                html += `<svg class="b3-menu__action${options.action === "iconCloseRound" ? " b3-menu__action--close" : ""}"><use xlink:href="#${options.action}"></use></svg>`;
             }
             this.element.innerHTML = html;
         }

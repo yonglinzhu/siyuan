@@ -57,7 +57,7 @@ import {openCard, openCardByData} from "../../card/openCard";
 import {lockScreen} from "../../dialog/processSystem";
 import {isWindow} from "../../util/functions";
 import {reloadProtyle} from "../../protyle/util/reload";
-import {fullscreen} from "../../protyle/breadcrumb/action";
+import {fullscreen, updateReadonly} from "../../protyle/breadcrumb/action";
 import {openRecentDocs} from "../../business/openRecentDocs";
 import {App} from "../../index";
 import {commandPanel} from "../../plugin/commandPanel";
@@ -74,6 +74,7 @@ import {getContentByInlineHTML} from "../../protyle/wysiwyg/keydown";
 import {searchKeydown} from "./searchKeydown";
 import {openNewWindow} from "../../window/openNewWindow";
 import {historyKeydown} from "../../history/keydown";
+import {zoomOut} from "../../menus/protyle";
 
 const switchDialogEvent = (app: App, event: MouseEvent) => {
     event.preventDefault();
@@ -326,6 +327,16 @@ const editKeydown = (app: App, event: KeyboardEvent) => {
     const target = event.target as HTMLElement;
     if (target.tagName !== "TABLE" && ["INPUT", "TEXTAREA"].includes(target.tagName)) {
         return false;
+    }
+    if (matchHotKey(window.siyuan.config.keymap.editor.general.exitFocus.custom, event)) {
+        event.preventDefault();
+        zoomOut({protyle, id: protyle.block.rootID, focusId: protyle.block.id});
+        return true;
+    }
+    if (matchHotKey(window.siyuan.config.keymap.editor.general.switchReadonly.custom, event)) {
+        event.preventDefault();
+        updateReadonly(protyle.breadcrumb.element.parentElement.querySelector('.block__icon[data-type="readonly"]'), protyle);
+        return true;
     }
     if (matchHotKey(window.siyuan.config.keymap.editor.general.backlinks.custom, event)) {
         event.preventDefault();
@@ -1037,7 +1048,7 @@ const panelTreeKeydown = (app: App, event: KeyboardEvent) => {
 let switchDialog: Dialog;
 export const windowKeyDown = (app: App, event: KeyboardEvent) => {
     // https://github.com/siyuan-note/siyuan/issues/9848 忘记为什么要阻止了 .av__mask 的情况，测了下没问题就先移除
-    if (document.getElementById("errorLog") || event.isComposing) {
+    if (document.getElementById("progress") || document.getElementById("errorLog") || event.isComposing) {
         return;
     }
     const target = event.target as HTMLElement;

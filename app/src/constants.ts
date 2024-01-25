@@ -6,6 +6,8 @@ declare const NODE_ENV: string;
 const _SIYUAN_VERSION = SIYUAN_VERSION;
 const _NODE_ENV = NODE_ENV;
 
+const altNumber = navigator.platform.toUpperCase().indexOf("MAC") > -1 ? "⌃" : "⌥";
+
 export abstract class Constants {
     public static readonly SIYUAN_VERSION: string = _SIYUAN_VERSION;
     public static readonly NODE_ENV: string = _NODE_ENV;
@@ -115,6 +117,51 @@ export abstract class Constants {
     public static readonly DIALOG_REPLACE = "dialog-replace";
     public static readonly DIALOG_GLOBALSEARCH = "dialog-globalsearch";
     public static readonly DIALOG_HISTORYCOMPARE = "dialog-historycompare";
+
+    public static readonly DIALOG_ACCESSAUTHCODE = "dialog-accessauthcode"; // 访问鉴权码
+    public static readonly DIALOG_AICUSTOMACTION = "dialog-aicustomaction"; // AI 自定义操作
+    public static readonly DIALOG_AIUPDATECUSTOMACTION = "dialog-aiupdatecustomaction"; // 更新 AI 自定义操作
+    public static readonly DIALOG_BACKGROUNDLINK = "dialog-backgroundlink"; // 题头图-随机
+    public static readonly DIALOG_BACKGROUNDRANDOM = "dialog-backgroundrandom"; // 题头图-链接
+    public static readonly DIALOG_CHANGELOG = "dialog-changelog"; // 更新日志
+    public static readonly DIALOG_COMMANDPANEL = "dialog-commandpanel"; // 插件命令面板
+    public static readonly DIALOG_DEACTIVATEUSER = "dialog-deactivateuser"; // 注销账户
+    public static readonly DIALOG_EMOJIS = "dialog-emojis"; // 文档、笔记本图表
+    public static readonly DIALOG_EXPORTIMAGE = "dialog-exportimage"; // 导出为图片
+    public static readonly DIALOG_EXPORTTEMPLATE = "dialog-exporttemplate"; // 导出为模板
+    public static readonly DIALOG_EXPORTWORD = "dialog-exportword"; // 导出为 word
+    public static readonly DIALOG_HISTORY = "dialog-history"; // 数据历史(Alt + H)
+    public static readonly DIALOG_HISTORYDOC = "dialog-historydoc"; // 文档历史
+    public static readonly DIALOG_MOVEPATHTO = "dialog-movepathto"; // 移动文档
+    public static readonly DIALOG_RENAME = "dialog-rename"; // 重命名
+    public static readonly DIALOG_RENAMEASSETS = "dialog-renameassets"; // 重命名资源文件
+    public static readonly DIALOG_RENAMEBOOKMARK = "dialog-renamebookmark"; // 重命名书签
+    public static readonly DIALOG_RENAMETAG = "dialog-renametag"; // 重命名标签
+    public static readonly DIALOG_REPLACETYPE = "dialog-replacetype"; // 替换 - 替换类型
+    public static readonly DIALOG_SAVECRITERION = "dialog-savecriterion"; // 保存查询条件
+    public static readonly DIALOG_SEARCHTYPE = "dialog-searchtype"; // 搜索 - 类型
+    public static readonly DIALOG_SEARCHASSETSTYPE = "dialog-searchassetstype"; // 搜索资源文件 - 类型
+    public static readonly DIALOG_SETTING = "dialog-setting"; // 设置面板
+    public static readonly DIALOG_SNAPSHOTTAG = "dialog-snapshottag"; // 标记快照
+    public static readonly DIALOG_SNAPSHOTMEMO = "dialog-snapshotmemo"; // 快照备注
+    public static readonly DIALOG_SNIPPETS = "dialog-snippets"; // 代码片段
+    public static readonly DIALOG_SYNCADDCLOUDDIR = "dialog-syncaddclouddir"; // 新建云端同步目录
+    public static readonly DIALOG_SYNCCHOOSEDIR = "dialog-syncchoosedir"; // 选择云端同步目录
+    public static readonly DIALOG_SYNCCHOOSEDIRECTION = "dialog-syncchoosedirection"; // 选择云端同步方向
+    public static readonly DIALOG_TRANSFERBLOCKREF = "dialog-transferblockref"; // 转移引用
+    public static readonly DIALOG_WECHATREMINDER = "dialog-wechatreminder"; // 微信提醒
+    public static readonly DIALOG_PASSWORD = "dialog-password"; // 导入同步密钥
+    public static readonly DIALOG_SETPASSWORD = "dialog-setpassword"; // 设置同步密钥
+    public static readonly DIALOG_BOOTSYNCFAILED = "dialog-bootsyncfailed"; // 启动时同步数据失败
+    public static readonly DIALOG_KERNELFAULT = "dialog-kernelfault"; // 内核退出
+    public static readonly DIALOG_STATEEXCEPTED = "dialog-stateexcepted"; // 状态异常
+    public static readonly DIALOG_ATTR = "dialog-attr"; // 设置块属性
+    public static readonly DIALOG_SETCUSTOMATTR = "dialog-setcustomattr"; // 设置自定义属性
+    public static readonly DIALOG_CREATENOTEBOOK = "dialog-createnotebook"; // 创建笔记本
+    public static readonly DIALOG_NOTEBOOKCONF = "dialog-notebookconf"; // 笔记本设置
+    public static readonly DIALOG_CREATEWORKSPACE = "dialog-createworkspace"; // 创建工作空间
+    public static readonly DIALOG_OPENWORKSPACE = "dialog-openworkspace"; // 打开工作空间
+    public static readonly DIALOG_SAVEWORKSPACE = "dialog-saveworkspace"; // 保存工作空间
 
     // timeout
     public static readonly TIMEOUT_DBLCLICK = 190;
@@ -239,7 +286,7 @@ export abstract class Constants {
     // 冲突不使用 "⌘S/Q"
     // "⌘", "⇧", "⌥", "⌃"
     // "⌘A", "⌘X", "⌘C", "⌘V", "⌘-", "⌘=", "⌘0", "⇧⌘V", "⌘/", "⇧↑", "⇧↓", "⇧→", "⇧←", "⇧⇥", "⌃D", "⇧⌘→", "⇧⌘←",
-    // "⌘Home", "⌘End", "⇧↩", "↩", "PageUp", "PageDown", "⌫", "⌦" 不可自定义
+    // "⌘Home", "⌘End", "⇧↩", "↩", "PageUp", "PageDown", "⌫", "⌦", "Escape" 不可自定义
     public static readonly SIYUAN_KEYMAP: IKeymap = {
         general: {
             mainMenu: {default: "⌥\\", custom: "⌥\\"},
@@ -256,16 +303,16 @@ export abstract class Constants {
             stickSearch: {default: "⇧⌘F", custom: "⇧⌘F"},
             replace: {default: "⌘R", custom: "⌘R"},
             closeTab: {default: "⌘W", custom: "⌘W"},
-            fileTree: {default: "⌥1", custom: "⌥1"},
-            outline: {default: "⌥2", custom: "⌥2"},
-            bookmark: {default: "⌥3", custom: "⌥3"},
-            tag: {default: "⌥4", custom: "⌥4"},
-            dailyNote: {default: "⌥5", custom: "⌥5"},
-            inbox: {default: "⌥6", custom: "⌥6"},
-            backlinks: {default: "⌥7", custom: "⌥7"},
-            graphView: {default: "⌥8", custom: "⌥8"},
-            globalGraph: {default: "⌥9", custom: "⌥9"},
-            riffCard: {default: "⌥0", custom: "⌥0"},
+            fileTree: {default: altNumber + "1", custom: altNumber + "1"},
+            outline: {default: altNumber + "2", custom: altNumber + "2"},
+            bookmark: {default: altNumber + "3", custom: altNumber + "3"},
+            tag: {default: altNumber + "4", custom: altNumber + "4"},
+            dailyNote: {default: altNumber + "5", custom: altNumber + "5"},
+            inbox: {default: altNumber + "6", custom: altNumber + "6"},
+            backlinks: {default: altNumber + "7", custom: altNumber + "7"},
+            graphView: {default: altNumber + "8", custom: altNumber + "8"},
+            globalGraph: {default: altNumber + "9", custom: altNumber + "9"},
+            riffCard: {default: altNumber + "0", custom: altNumber + "0"},
             config: {default: "⌥P", custom: "⌥P"},
             dataHistory: {default: "⌥H", custom: "⌥H"},
             toggleWin: {default: "⌥M", custom: "⌥M"},
@@ -313,6 +360,8 @@ export abstract class Constants {
                 vLayout: {default: "", custom: ""},
                 refPopover: {default: "", custom: ""},
                 copyText: {default: "", custom: ""},
+                exitFocus: {default: "", custom: ""},
+                switchReadonly: {default: "", custom: ""},
                 expand: {default: "⌘↓", custom: "⌘↓"},
                 collapse: {default: "⌘↑", custom: "⌘↑"},
                 insertBottom: {default: "⌥⌘.", custom: "⌥⌘."},
@@ -612,7 +661,7 @@ export abstract class Constants {
         "lightfair", "magula", "mono-blue", "nnfx-light", "panda-syntax-light", "paraiso-light", "purebasic", "qtcreator-light", "routeros", "school-book",
         "stackoverflow-light", "tokyo-night-light", "vs", "xcode", "default"];
     public static readonly ZWSP: string = "\u200b";
-    public static readonly INLINE_TYPE: string[] = ["block-ref", "kbd", "text", "file-annotation-ref", "a", "strong", "em", "u", "s", "mark", "sup", "sub", "tag", "code", "inline-math", "inline-memo"];
+    public static readonly INLINE_TYPE: string[] = ["block-ref", "kbd", "text", "file-annotation-ref", "a", "strong", "em", "u", "s", "mark", "sup", "sub", "tag", "code", "inline-math", "inline-memo", "clear"];
     public static readonly BLOCK_HINT_KEYS: string[] = ["((", "[[", "（（", "【【"];
     public static readonly BLOCK_HINT_CLOSE_KEYS: IObject = {"((": "))", "[[": "]]", "（（": "））", "【【": "】】"};
     // common: "bash", "c", "csharp", "cpp", "css", "diff", "go", "xml", "json", "java", "javascript", "kotlin", "less", "lua", "makefile", "markdown", "objectivec", "php", "php-template", "perl", "plaintext", "python", "python-repl", "r", "ruby", "rust", "scss", "sql", "shell", "swift", "ini", "typescript", "vbnet", "yaml", "properties", "1c", "armasm", "avrasm", "actionscript", "ada", "angelscript", "accesslog", "apache", "applescript", "arcade", "arduino", "asciidoc", "aspectj", "abnf", "autohotkey", "autoit", "awk", "basic", "bnf", "dos", "brainfuck", "cal", "cmake", "csp", "cos", "capnproto", "ceylon", "clean", "clojure", "clojure-repl", "coffeescript", "coq", "crystal", "d", "dns", "dart", "delphi", "dts", "django", "dockerfile", "dust", "erb", "elixir", "elm", "erlang", "erlang-repl", "excel", "ebnf", "fsharp", "fix", "flix", "fortran", "gcode", "gams", "gauss", "glsl", "gml", "gherkin", "golo", "gradle", "groovy", "haml", "hsp", "http", "handlebars", "haskell", "haxe", "hy", "irpf90", "isbl", "inform7", "x86asm", "jboss-cli", "julia", "julia-repl", "ldif", "llvm", "lsl", "latex", "lasso", "leaf", "lisp", "livecodeserver", "livescript", "mel", "mipsasm", "matlab", "maxima", "mercury", "axapta", "routeros", "mizar", "mojolicious", "monkey", "moonscript", "n1ql", "nsis", "nestedtext", "nginx", "nim", "nix", "node-repl", "ocaml", "openscad", "ruleslanguage", "oxygene", "pf", "parser3", "pony", "pgsql", "powershell", "processing", "prolog", "protobuf", "puppet", "purebasic", "profile", "q", "qml", "reasonml", "rib", "rsl", "roboconf", "sas", "sml", "sqf", "step21", "scala", "scheme", "scilab", "smali", "smalltalk", "stan", "stata", "stylus", "subunit", "tp", "taggerscript", "tcl", "tap", "thrift", "twig", "vbscript", "vbscript-html", "vhdl", "vala", "verilog", "vim", "wasm", "mathematica", "wren", "xl", "xquery", "zephir", "crmsh", "dsconfig", "graphql",

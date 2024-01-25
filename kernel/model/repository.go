@@ -483,6 +483,29 @@ func ResetRepo() (err error) {
 	return
 }
 
+func PurgeCloud() (err error) {
+	msg := Conf.Language(223)
+	util.PushEndlessProgress(msg)
+	defer util.PushClearProgress()
+
+	repo, err := newRepository()
+	if nil != err {
+		return
+	}
+
+	stat, err := repo.PurgeCloud()
+	if nil != err {
+		return
+	}
+
+	deletedIndexes := stat.Indexes
+	deletedObjects := stat.Objects
+	deletedSize := humanize.Bytes(uint64(stat.Size))
+	msg = fmt.Sprintf(Conf.Language(232), deletedIndexes, deletedObjects, deletedSize)
+	util.PushMsg(msg, 5000)
+	return
+}
+
 func PurgeRepo() (err error) {
 	msg := Conf.Language(202)
 	util.PushEndlessProgress(msg)
@@ -955,9 +978,13 @@ var syncingFiles = sync.Map{}
 var syncingStorages = atomic.Bool{}
 
 func waitForSyncingStorages() {
-	for syncingStorages.Load() {
+	for isSyncingStorages() {
 		time.Sleep(time.Second)
 	}
+}
+
+func isSyncingStorages() bool {
+	return syncingStorages.Load() || isBootSyncing.Load()
 }
 
 func IsSyncingFile(rootID string) (ret bool) {
@@ -1105,6 +1132,8 @@ func syncRepoUpload() (err error) {
 	return
 }
 
+var isBootSyncing = atomic.Bool{}
+
 func bootSyncRepo() (err error) {
 	if 1 > len(Conf.Repo.Key) {
 		autoSyncErrCount++
@@ -1129,11 +1158,14 @@ func bootSyncRepo() (err error) {
 		return
 	}
 
+	isBootSyncing.Store(true)
+
 	start := time.Now()
 	_, _, err = indexRepoBeforeCloudSync(repo)
 	if nil != err {
 		autoSyncErrCount++
 		planSyncAfter(fixSyncInterval)
+		isBootSyncing.Store(false)
 		return
 	}
 
@@ -1180,17 +1212,21 @@ func bootSyncRepo() (err error) {
 		util.PushStatusBar(msg)
 		util.PushErrMsg(msg, 0)
 		BootSyncSucc = 1
+		isBootSyncing.Store(false)
 		return
 	}
 
 	if 0 < len(fetchedFiles) {
 		go func() {
 			_, syncErr := syncRepo(false, false)
+			isBootSyncing.Store(false)
 			if nil != err {
 				logging.LogErrorf("boot background sync repo failed: %s", syncErr)
 				return
 			}
 		}()
+	} else {
+		isBootSyncing.Store(false)
 	}
 	return
 }
@@ -1337,19 +1373,24 @@ func processSyncMergeResult(exit, byHand bool, mergeResult *dejavu.MergeResult, 
 	// 有数据变更，需要重建索引
 	var upserts, removes []string
 	var upsertTrees int
-	var needReloadFlashcard, needReloadOcrTexts, needReloadFiletree bool
+	// 可能需要重新加载部分功能
+	var needReloadFlashcard, needReloadOcrTexts, needReloadFiletree, needReloadPlugin bool
 	for _, file := range mergeResult.Upserts {
 		upserts = append(upserts, file.Path)
 		if strings.HasPrefix(file.Path, "/storage/riff/") {
 			needReloadFlashcard = true
 		}
 
-		if strings.HasPrefix(file.Path, "/data/assets/ocr-texts.json") {
+		if strings.HasPrefix(file.Path, "/assets/ocr-texts.json") {
 			needReloadOcrTexts = true
 		}
 
 		if strings.HasSuffix(file.Path, "/.siyuan/conf.json") {
 			needReloadFiletree = true
+		}
+
+		if strings.HasPrefix(file.Path, "/storage/petal/") {
+			needReloadPlugin = true
 		}
 
 		if strings.HasSuffix(file.Path, ".sy") {
@@ -1362,12 +1403,16 @@ func processSyncMergeResult(exit, byHand bool, mergeResult *dejavu.MergeResult, 
 			needReloadFlashcard = true
 		}
 
-		if strings.HasPrefix(file.Path, "/data/assets/ocr-texts.json") {
+		if strings.HasPrefix(file.Path, "/assets/ocr-texts.json") {
 			needReloadOcrTexts = true
 		}
 
 		if strings.HasSuffix(file.Path, "/.siyuan/conf.json") {
 			needReloadFiletree = true
+		}
+
+		if strings.HasPrefix(file.Path, "/storage/petal/") {
+			needReloadPlugin = true
 		}
 	}
 
@@ -1377,6 +1422,10 @@ func processSyncMergeResult(exit, byHand bool, mergeResult *dejavu.MergeResult, 
 
 	if needReloadOcrTexts {
 		LoadAssetsTexts()
+	}
+
+	if needReloadPlugin {
+		pushReloadPlugin()
 	}
 
 	syncingFiles = sync.Map{}
@@ -1783,6 +1832,30 @@ func subscribeRepoEvents() {
 	eventbus.Subscribe(eventbus.EvtCloudCorrupted, func() {
 		util.PushErrMsg(Conf.language(220), 30000)
 	})
+	eventbus.Subscribe(eventbus.EvtCloudPurgeListObjects, func(context map[string]interface{}) {
+		util.ContextPushMsg(context, Conf.language(224))
+	})
+	eventbus.Subscribe(eventbus.EvtCloudPurgeListIndexes, func(context map[string]interface{}) {
+		util.ContextPushMsg(context, Conf.language(225))
+	})
+	eventbus.Subscribe(eventbus.EvtCloudPurgeListRefs, func(context map[string]interface{}) {
+		util.ContextPushMsg(context, Conf.language(226))
+	})
+	eventbus.Subscribe(eventbus.EvtCloudPurgeDownloadIndexes, func(context map[string]interface{}) {
+		util.ContextPushMsg(context, fmt.Sprintf(Conf.language(227)))
+	})
+	eventbus.Subscribe(eventbus.EvtCloudPurgeDownloadFiles, func(context map[string]interface{}) {
+		util.ContextPushMsg(context, Conf.language(228))
+	})
+	eventbus.Subscribe(eventbus.EvtCloudPurgeRemoveIndexes, func(context map[string]interface{}) {
+		util.ContextPushMsg(context, Conf.language(229))
+	})
+	eventbus.Subscribe(eventbus.EvtCloudPurgeRemoveIndexesV2, func(context map[string]interface{}) {
+		util.ContextPushMsg(context, Conf.language(230))
+	})
+	eventbus.Subscribe(eventbus.EvtCloudPurgeRemoveObjects, func(context map[string]interface{}) {
+		util.ContextPushMsg(context, Conf.language(231))
+	})
 }
 
 func buildCloudConf() (ret *cloud.Conf, err error) {
@@ -1913,4 +1986,8 @@ func getCloudSpace() (stat *cloud.Stat, err error) {
 		return
 	}
 	return
+}
+
+func pushReloadPlugin() {
+	util.BroadcastByType("main", "reloadPlugin", 0, "", nil)
 }
