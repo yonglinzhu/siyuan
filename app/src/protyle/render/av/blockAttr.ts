@@ -54,7 +54,7 @@ export const genAVValueHTML = (value: IAVCellValue) => {
             html = `<textarea rows="${value.text.content.split("\n").length}" class="b3-text-field b3-text-field--text fn__flex-1">${value.text.content}</textarea>`;
             break;
         case "number":
-            html = `<input value="${value.number.content}" type="number" class="b3-text-field b3-text-field--text fn__flex-1">`;
+            html = `<input value="${value.number.content || ""}" type="number" class="b3-text-field b3-text-field--text fn__flex-1">`;
             break;
         case "mSelect":
         case "select":
@@ -161,7 +161,7 @@ export const renderAVAttribute = (element: HTMLElement, id: string, protyle: IPr
     <div class="fn__flex-1"></div>
 </div>`;
             table.keyValues?.forEach(item => {
-                html += `<div class="block__icons av__row" data-col-id="${item.key.id}">
+                html += `<div class="block__icons av__row" data-id="${id}" data-col-id="${item.key.id}">
     <div class="block__icon" draggable="true"><svg><use xlink:href="#iconDrag"></use></svg></div>
     <div class="block__logo ariaLabel${item.values[0].type === "block" ? "" : " fn__pointer"}" data-type="editCol" data-position="parentW" aria-label="${escapeAttr(item.key.name)}"">
         ${item.key.icon ? unicode2Emoji(item.key.icon, "block__logoicon", true) : `<svg class="block__logoicon"><use xlink:href="#${getColIconByType(item.key.type)}"></use></svg>`}
@@ -176,9 +176,8 @@ class="fn__flex-1 fn__flex${["url", "text", "number", "email", "phone", "block"]
             });
             html += `<div class="fn__hr"></div>
 <div class="fn__flex">
-    <div class="fn__flex-1"></div>
+    <div class="fn__space"></div><div class="fn__space"></div>
     <button data-type="addColumn" class="b3-button b3-button--outline"><svg><use xlink:href="#iconAdd"></use></svg>${window.siyuan.languages.addAttr}</button>
-    <div class="fn__space"></div>
 </div></div>`;
         });
         if (element.innerHTML === "") {
@@ -340,11 +339,21 @@ class="fn__flex-1 fn__flex${["url", "text", "number", "email", "phone", "block"]
                         }
                     };
                 } else if (item.parentElement.dataset.type === "number") {
-                    value = {
-                        number: {
-                            content: parseFloat(item.value)
-                        }
-                    };
+                    if ("undefined" === item.value || !item.value) {
+                        value = {
+                            number: {
+                                content: null,
+                                isNotEmpty: false
+                            }
+                        };
+                    } else {
+                        value = {
+                            number: {
+                                content: parseFloat(item.value) || 0,
+                                isNotEmpty: true
+                            }
+                        };
+                    }
                 }
                 fetchPost("/api/av/setAttributeViewBlockAttr", {
                     avID: item.parentElement.dataset.avId,
