@@ -147,7 +147,7 @@ interface Window {
     }
     mermaid: {
         initialize(options: any): void,
-        init(options: any, element: Element): void
+        render(id: string, text: string): { svg:string }
     };
     plantumlEncoder: {
         encode(options: string): string,
@@ -620,6 +620,7 @@ interface IEditor {
     rtl: boolean;
     readOnly: boolean;
     listLogicalOutdent: boolean;
+    listItemDotNumberClickFocus: boolean;
     spellcheck: boolean;
     onlySearchForDoc: boolean;
     katexMacros: string;
@@ -716,12 +717,15 @@ interface IConfig {
         superBlock: boolean
         heading: boolean
         deck: boolean
+        reviewMode: number
         requestRetention: number
         maximumInterval: number
         weights: string
     }
     ai: {
         openAI: {
+            apiProvider: string // OpenAI, Azure
+            apiUserAgent: string
             apiBaseURL: string
             apiKey: string
             apiModel: string

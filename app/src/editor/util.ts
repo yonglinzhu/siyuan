@@ -323,16 +323,6 @@ const getUnInitTab = (options: IOpenFileOptions) => {
 };
 
 const switchEditor = (editor: Editor, options: IOpenFileOptions, allModels: IModels) => {
-    allModels.editor.forEach((item) => {
-        if (!item.element.isSameNode(editor.element) && window.siyuan.editorIsFullscreen && item.element.classList.contains("fullscreen")) {
-            item.element.classList.remove("fullscreen");
-            resize(item.editor.protyle);
-        }
-    });
-    if (window.siyuan.editorIsFullscreen) {
-        editor.element.classList.add("fullscreen");
-        resize(editor.editor.protyle);
-    }
     if (options.keepCursor) {
         editor.parent.headElement.setAttribute("keep-cursor", options.id);
         return true;
@@ -542,14 +532,14 @@ export const updatePanelByEditor = (options: {
                 }
             }
         }
-        // 切换页签或关闭所有页签时，需更新对应的面板
-        const models = getAllModels();
-        updateOutline(models, options.protyle, options.reload);
-        updateBacklinkGraph(models, options.protyle);
         options.protyle.app.plugins.forEach(item => {
             item.eventBus.emit("switch-protyle", {protyle: options.protyle});
         });
     }
+    // 切换页签或关闭所有页签时，需更新对应的面板
+    const models = getAllModels();
+    updateOutline(models, options.protyle, options.reload);
+    updateBacklinkGraph(models, options.protyle);
 };
 
 export const isCurrentEditor = (blockId: string) => {

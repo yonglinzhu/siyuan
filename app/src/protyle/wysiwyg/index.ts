@@ -1295,7 +1295,7 @@ export class WYSIWYG {
                     }
                 }
                 const nextElement = getNextBlock(selectElements[selectElements.length - 1]);
-                removeBlock(protyle, nodeElement, range);
+                removeBlock(protyle, nodeElement, range, "remove");
                 if (nextElement) {
                     // Ctrl+X 剪切后光标应跳到下一行行首 https://github.com/siyuan-note/siyuan/issues/5485
                     focusBlock(nextElement);
@@ -2289,7 +2289,7 @@ export class WYSIWYG {
                                 actionElement.parentElement.setAttribute("updated", dayjs().format("YYYYMMDDHHmmss"));
                                 updateTransaction(protyle, actionId, actionElement.parentElement.outerHTML, html);
                             }
-                        } else {
+                        } else if (window.siyuan.config.editor.listItemDotNumberClickFocus) {
                             if (protyle.block.showAll && protyle.block.id === actionId) {
                                 enterBack(protyle, actionId);
                             } else {
@@ -2396,7 +2396,12 @@ export class WYSIWYG {
 
             setTimeout(() => {
                 // 选中后，在选中的文字上点击需等待 range 更新
-                const newRange = getEditorRange(this.element);
+                let newRange = getEditorRange(this.element);
+                // https://github.com/siyuan-note/siyuan/issues/10357
+                const attrElement = hasClosestByClassName(newRange.endContainer, "protyle-attr");
+                if (attrElement) {
+                    newRange = setLastNodeRange(attrElement.previousElementSibling, newRange, false);
+                }
                 /// #if !MOBILE
                 if (newRange.toString().replace(Constants.ZWSP, "") !== "") {
                     protyle.toolbar.render(protyle, newRange);

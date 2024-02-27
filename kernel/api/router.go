@@ -158,6 +158,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/search/findReplace", model.CheckAuth, findReplace)
 	ginServer.Handle("POST", "/api/search/fullTextSearchAssetContent", model.CheckAuth, fullTextSearchAssetContent)
 	ginServer.Handle("POST", "/api/search/getAssetContent", model.CheckAuth, getAssetContent)
+	ginServer.Handle("POST", "/api/search/listInvalidBlockRefs", model.CheckAuth, listInvalidBlockRefs)
 
 	ginServer.Handle("POST", "/api/block/getBlockInfo", model.CheckAuth, getBlockInfo)
 	ginServer.Handle("POST", "/api/block/getBlockDOM", model.CheckAuth, getBlockDOM)
@@ -181,6 +182,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/block/insertBlock", model.CheckAuth, model.CheckReadonly, insertBlock)
 	ginServer.Handle("POST", "/api/block/prependBlock", model.CheckAuth, model.CheckReadonly, prependBlock)
 	ginServer.Handle("POST", "/api/block/appendBlock", model.CheckAuth, model.CheckReadonly, appendBlock)
+	ginServer.Handle("POST", "/api/block/appendDailyNoteBlock", model.CheckAuth, model.CheckReadonly, appendDailyNoteBlock)
 	ginServer.Handle("POST", "/api/block/updateBlock", model.CheckAuth, model.CheckReadonly, updateBlock)
 	ginServer.Handle("POST", "/api/block/deleteBlock", model.CheckAuth, model.CheckReadonly, deleteBlock)
 	ginServer.Handle("POST", "/api/block/moveBlock", model.CheckAuth, model.CheckReadonly, moveBlock)
@@ -383,6 +385,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/riff/getTreeRiffCards", model.CheckAuth, getTreeRiffCards)
 	ginServer.Handle("POST", "/api/riff/getNotebookRiffCards", model.CheckAuth, getNotebookRiffCards)
 	ginServer.Handle("POST", "/api/riff/resetRiffCards", model.CheckAuth, model.CheckReadonly, resetRiffCards)
+	ginServer.Handle("POST", "/api/riff/batchSetRiffCardsDueTime", model.CheckAuth, model.CheckReadonly, batchSetRiffCardsDueTime)
 
 	ginServer.Handle("POST", "/api/notification/pushMsg", model.CheckAuth, pushMsg)
 	ginServer.Handle("POST", "/api/notification/pushErrMsg", model.CheckAuth, pushErrMsg)
@@ -406,6 +409,7 @@ func ServeAPI(ginServer *gin.Engine) {
 	ginServer.Handle("POST", "/api/av/sortAttributeViewKey", model.CheckAuth, model.CheckReadonly, sortAttributeViewCol)
 	ginServer.Handle("POST", "/api/av/addAttributeViewValues", model.CheckAuth, model.CheckReadonly, addAttributeViewValues)
 	ginServer.Handle("POST", "/api/av/removeAttributeViewValues", model.CheckAuth, model.CheckReadonly, removeAttributeViewValues)
+	ginServer.Handle("POST", "/api/av/getAttributeViewPrimaryKeyValues", model.CheckAuth, model.CheckReadonly, getAttributeViewPrimaryKeyValues)
 
 	ginServer.Handle("POST", "/api/ai/chatGPT", model.CheckAuth, chatGPT)
 	ginServer.Handle("POST", "/api/ai/chatGPTWithAction", model.CheckAuth, chatGPTWithAction)
