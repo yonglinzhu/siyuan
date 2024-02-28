@@ -49,4 +49,4 @@ jobs:
 
       - name: Build the Docker image
         run: |
-          docker buildx build --push --platform linux/amd64 -t feelmoreof/siyuan:latest -t feelmoreof/siyuan:3.0.1 .
+          docker buildx build --push --platform linux/amd64 -t feelmoreof/siyuan:latest -t feelmoreof/siyuan:3.0.1.228 .
