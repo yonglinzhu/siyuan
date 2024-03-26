@@ -210,9 +210,8 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
     }
 
     public bindUploadEvent(protyle: IProtyle, element: HTMLElement) {
-        const uploadElement = element.querySelector('input[type="file"]');
-        if (uploadElement) {
-            uploadElement.addEventListener("change", (event: InputEvent & { target: HTMLInputElement }) => {
+        element.querySelectorAll('input[type="file"]').forEach(item => {
+            item.addEventListener("change", (event: InputEvent & { target: HTMLInputElement }) => {
                 if (event.target.files.length === 0) {
                     return;
                 }
@@ -224,7 +223,7 @@ ${unicode2Emoji(emoji.unicode)}</button>`;
                 uploadFiles(protyle, event.target.files, event.target);
                 hideElements(["hint", "toolbar"], protyle);
             });
-        }
+        });
     }
 
     private getHTMLByData(data: IHintData[]) {
@@ -620,7 +619,7 @@ ${genHintItemHTML(item)}
                 fetchPost("/api/filetree/createDoc", {
                     notebook: protyle.notebookId,
                     path: pathPosix().join(getDisplayName(protyle.path, false, true), newSubDocId + ".sy"),
-                    title: "Untitled",
+                    title: window.siyuan.languages.untitled,
                     md: ""
                 }, () => {
                     insertHTML(`<span data-type="block-ref" data-id="${newSubDocId}" data-subtype="d">Untitled</span>`, protyle);
@@ -681,7 +680,7 @@ ${genHintItemHTML(item)}
                 }
                 let textContent = value;
                 if (value === "```") {
-                    textContent = value + window.siyuan.storage[Constants.LOCAL_CODELANG] + Lute.Caret + "\n```";
+                    textContent = value + (Constants.SIYUAN_RENDER_CODE_LANGUAGES.includes(window.siyuan.storage[Constants.LOCAL_CODELANG]) ? "" : window.siyuan.storage[Constants.LOCAL_CODELANG]) + Lute.Caret + "\n```";
                 }
                 const editableElement = getContenteditableElement(nodeElement);
                 if (value === "![]()") { // https://github.com/siyuan-note/siyuan/issues/4586 1
@@ -764,7 +763,7 @@ ${genHintItemHTML(item)}
                         action: "update"
                     }]);
                 }
-                if (value === "<div>" || value === "$$" || (value.indexOf("```") > -1 && value.length > 3)) {
+                if (value === "<div>" || value === "$$" || (value.indexOf("```") > -1 && (value.length > 3 || nodeElement.classList.contains("render-node")))) {
                     protyle.toolbar.showRender(protyle, nodeElement);
                     processRender(nodeElement);
                 } else if (value.startsWith("```")) {
@@ -971,7 +970,10 @@ ${genHintItemHTML(item)}
         }
         const lineArray = currentLineValue.split(this.splitChar);
         const lastItem = lineArray[lineArray.length - 1];
-        if (lineArray.length > 1 && lastItem.trim() === lastItem && lastItem.length < Constants.SIZE_TITLE) {
+        if (lineArray.length > 1 &&
+            // https://github.com/siyuan-note/siyuan/issues/10637
+            lastItem.trimStart() === lastItem &&
+            lastItem.length < Constants.SIZE_TITLE) {
             // 输入法自动补全 https://github.com/siyuan-note/insider/issues/100
             if (this.splitChar === "【【" && currentLineValue.endsWith("【【】")) {
                 return "";

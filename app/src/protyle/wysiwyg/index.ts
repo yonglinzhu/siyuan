@@ -82,6 +82,7 @@ import {openViewMenu} from "../render/av/view";
 import {avRender} from "../render/av/render";
 import {checkFold} from "../../util/noRelyPCFunction";
 import {
+    addDragFill,
     dragFillCellsValue,
     genCellValueByElement,
     getCellText,
@@ -240,7 +241,7 @@ export class WYSIWYG {
         this.element.addEventListener("copy", (event: ClipboardEvent & { target: HTMLElement }) => {
             window.siyuan.ctrlIsPressed = false; // https://github.com/siyuan-note/siyuan/issues/6373
             // https://github.com/siyuan-note/siyuan/issues/4600
-            if (event.target.tagName === "PROTYLE-HTML") {
+            if (event.target.tagName === "PROTYLE-HTML" || event.target.localName === "input") {
                 event.stopPropagation();
                 return;
             }
@@ -307,7 +308,13 @@ export class WYSIWYG {
                     html = "[";
                     cellElements.forEach((item: HTMLElement, index) => {
                         const cellText = getCellText(item);
+                        if (index === 0 || !cellElements[index - 1].isSameNode(item.previousElementSibling)) {
+                            html += "[";
+                        }
                         html += JSON.stringify(genCellValueByElement(getTypeByCellElement(item), item)) + ",";
+                        if (index === cellElements.length - 1 || !cellElements[index + 1].isSameNode(item.nextElementSibling)) {
+                            html = html.substring(0, html.length - 1) + "],";
+                        }
                         textPlain += cellText + ((cellElements[index + 1] && item.nextElementSibling && item.nextElementSibling.isSameNode(cellElements[index + 1])) ? "\t" : "\n\n");
                     });
                     textPlain = textPlain.substring(0, textPlain.length - 2);
@@ -412,6 +419,7 @@ export class WYSIWYG {
                     return;
                 }
                 const avId = nodeElement.getAttribute("data-av-id");
+                const blockID = nodeElement.dataset.nodeId;
                 const dragElement = target.parentElement;
                 const oldWidth = dragElement.clientWidth;
                 const dragColId = dragElement.getAttribute("data-col-id");
@@ -439,12 +447,14 @@ export class WYSIWYG {
                         action: "setAttrViewColWidth",
                         id: dragColId,
                         avID: avId,
-                        data: newWidth
+                        data: newWidth,
+                        blockID
                     }], [{
                         action: "setAttrViewColWidth",
                         id: dragColId,
                         avID: avId,
-                        data: oldWidth + "px"
+                        data: oldWidth + "px",
+                        blockID
                     }]);
                 };
                 this.preventClick = true;
@@ -514,7 +524,7 @@ export class WYSIWYG {
                     documentSelf.onselect = null;
                     if (lastCellElement) {
                         dragFillCellsValue(protyle, nodeElement, originData, originCellIds);
-                        lastCellElement.insertAdjacentHTML("beforeend", `<div aria-label="${window.siyuan.languages.dragFill}" class="av__drag-fill ariaLabel"></div>`);
+                        addDragFill(lastCellElement);
                     }
                     return false;
                 };
@@ -586,7 +596,7 @@ export class WYSIWYG {
                     if (lastCellElement) {
                         selectRow(nodeElement.querySelector(".av__firstcol"), "unselectAll");
                         focusBlock(nodeElement);
-                        lastCellElement.insertAdjacentHTML("beforeend", `<div aria-label="${window.siyuan.languages.dragFill}" class="av__drag-fill ariaLabel"></div>`);
+                        addDragFill(lastCellElement);
                         this.preventClick = true;
                     }
                     return false;
@@ -872,14 +882,27 @@ export class WYSIWYG {
                     return;
                 }
                 let firstBlockElement = hasClosestBlock(firstElement);
+                if (!firstBlockElement && firstElement.classList.contains("protyle-breadcrumb__bar")) {
+                    firstBlockElement = firstElement.nextElementSibling as HTMLElement;
+                }
                 if (moveEvent.clientY > y) {
                     if (!startFirstElement) {
-                        startFirstElement = firstElement;
+                        // 向上选择导致滚动条滚动到顶部再向下选择至 > y 时，firstBlockElement 为 undefined https://ld246.com/article/1705233964097
+                        if (!firstBlockElement) {
+                            firstBlockElement = protyle.wysiwyg.element.firstElementChild as HTMLElement;
+                            if (firstBlockElement.classList.contains("protyle-breadcrumb__bar")) {
+                                firstBlockElement = firstBlockElement.nextElementSibling as HTMLElement;
+                            }
+                        }
+                        startFirstElement = firstBlockElement;
                     }
                 } else if (!firstBlockElement &&
                     // https://github.com/siyuan-note/siyuan/issues/7580
                     moveEvent.clientY < protyle.wysiwyg.element.lastElementChild.getBoundingClientRect().bottom) {
                     firstBlockElement = protyle.wysiwyg.element.firstElementChild as HTMLElement;
+                    if (firstBlockElement.classList.contains("protyle-breadcrumb__bar")) {
+                        firstBlockElement = firstBlockElement.nextElementSibling as HTMLElement;
+                    }
                 }
                 let selectElements: Element[] = [];
                 let currentElement: Element | boolean = firstBlockElement;
@@ -908,7 +931,9 @@ export class WYSIWYG {
                                     hasJump = true;
                                 }
                             } else {
-                                selectElements.push(currentElement);
+                                if (!currentElement.classList.contains("protyle-breadcrumb__bar")) {
+                                    selectElements.push(currentElement);
+                                }
                                 currentElement = currentElement.nextElementSibling;
                             }
                         } else if (currentElement.parentElement.classList.contains("sb")) {
@@ -1248,7 +1273,7 @@ export class WYSIWYG {
             if (protyle.disabled) {
                 return;
             }
-            if (event.target.tagName === "PROTYLE-HTML") {
+            if (event.target.tagName === "PROTYLE-HTML" || event.target.localName === "input") {
                 event.stopPropagation();
                 return;
             }
@@ -1429,6 +1454,11 @@ export class WYSIWYG {
                 }
                 this.emojiToMd(tempElement);
                 html = tempElement.innerHTML;
+                // https://github.com/siyuan-note/siyuan/issues/10722
+                if (hasClosestByAttribute(range.startContainer, "data-type", "NodeCodeBlock") ||
+                    hasClosestByMatchTag(range.startContainer, "CODE")) {
+                    textPlain = tempElement.textContent.replace(Constants.ZWSP, "");
+                }
                 // https://github.com/siyuan-note/siyuan/issues/4321
                 if (!nodeElement.classList.contains("table")) {
                     const editableElement = getContenteditableElement(nodeElement);
@@ -1449,7 +1479,7 @@ export class WYSIWYG {
             }
             protyle.hint.render(protyle);
             if (!selectAVElement) {
-                textPlain = protyle.lute.BlockDOM2StdMd(html).trimEnd(); // 需要 trimEnd，否则 \n 会导致 https://github.com/siyuan-note/siyuan/issues/6218
+                textPlain = textPlain || protyle.lute.BlockDOM2StdMd(html).trimEnd(); // 需要 trimEnd，否则 \n 会导致 https://github.com/siyuan-note/siyuan/issues/6218
             }
             textPlain = textPlain.replace(/\u00A0/g, " "); // Replace non-breaking spaces with normal spaces when copying https://github.com/siyuan-note/siyuan/issues/9382
             event.clipboardData.setData("text/plain", textPlain);
@@ -1707,7 +1737,7 @@ export class WYSIWYG {
             }
             window.siyuan.ctrlIsPressed = false; // https://github.com/siyuan-note/siyuan/issues/6373
             // https://github.com/siyuan-note/siyuan/issues/4600
-            if (event.target.tagName === "PROTYLE-HTML") {
+            if (event.target.tagName === "PROTYLE-HTML" || event.target.localName === "input") {
                 event.stopPropagation();
                 return;
             }
@@ -2029,6 +2059,26 @@ export class WYSIWYG {
                 /// #endif
                 return;
             }
+            /// #if MOBILE
+            // https://github.com/siyuan-note/siyuan/issues/10513
+            const virtualRefElement = hasClosestByAttribute(event.target, "data-type", "virtual-block-ref");
+            if (virtualRefElement) {
+                const blockElement = hasClosestBlock(virtualRefElement);
+                if (blockElement) {
+                    fetchPost("/api/block/getBlockDefIDsByRefText", {
+                        anchor: virtualRefElement.textContent,
+                        excludeIDs: [blockElement.getAttribute("data-node-id")]
+                    }, (response) => {
+                        checkFold(response.data[0], (zoomIn) => {
+                            openMobileFileById(protyle.app, response.data[0], zoomIn ? [Constants.CB_GET_ALL, Constants.CB_GET_HL] : [Constants.CB_GET_HL, Constants.CB_GET_CONTEXT, Constants.CB_GET_ROOTSCROLL]);
+                            activeBlur();
+                            hideKeyboardToolbar();
+                        });
+                    });
+                }
+                return;
+            }
+            /// #endif
 
             const fileElement = hasClosestByAttribute(event.target, "data-type", "file-annotation-ref");
             if (fileElement && range.toString() === "") {
@@ -2050,7 +2100,7 @@ export class WYSIWYG {
                 return;
             }
 
-            if (aElement && !event.altKey) {
+            if (aElement) {
                 event.stopPropagation();
                 event.preventDefault();
                 let linkAddress = Lute.UnEscapeHTMLStr(aLink);
@@ -2063,10 +2113,20 @@ export class WYSIWYG {
                         (!linkPathname.endsWith(".pdf") ||
                             (linkPathname.endsWith(".pdf") && !linkAddress.startsWith("file://")))
                     ) {
-                        if (ctrlIsPressed) {
+                        if (event.altKey) {
+                            openAsset(protyle.app, linkAddress, parseInt(getSearch("page", linkAddress)));
+                        } else if (ctrlIsPressed) {
+                            /// #if !BROWSER
                             openBy(linkAddress, "folder");
+                            /// #else
+                            openByMobile(linkAddress);
+                            /// #endif
                         } else if (event.shiftKey) {
+                            /// #if !BROWSER
                             openBy(linkAddress, "app");
+                            /// #else
+                            openByMobile(linkAddress);
+                            /// #endif
                         } else {
                             openAsset(protyle.app, linkPathname, parseInt(getSearch("page", linkAddress)), "right");
                         }
@@ -2082,12 +2142,12 @@ export class WYSIWYG {
                         /// #endif
                     }
                 } else if (linkAddress) {
-                    /// #if !BROWSER
                     if (0 > linkAddress.indexOf(":")) {
                         // 使用 : 判断，不使用 :// 判断 Open external application protocol invalid https://github.com/siyuan-note/siyuan/issues/10075
                         // Support click to open hyperlinks like `www.foo.com` https://github.com/siyuan-note/siyuan/issues/9986
                         linkAddress = `https://${linkAddress}`;
                     }
+                    /// #if !BROWSER
                     shell.openExternal(linkAddress).catch((e) => {
                         showMessage(e);
                     });

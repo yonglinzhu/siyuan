@@ -58,6 +58,7 @@ export abstract class Constants {
     // custom
     public static readonly CUSTOM_SY_READONLY: string = "custom-sy-readonly";
     public static readonly CUSTOM_SY_FULLWIDTH: string = "custom-sy-fullwidth";
+    public static readonly CUSTOM_SY_AV_VIEW: string = "custom-sy-av-view";
     public static readonly CUSTOM_REMINDER_WECHAT: string = "custom-reminder-wechat";
     public static readonly CUSTOM_RIFF_DECKS: string = "custom-riff-decks";
 
@@ -96,6 +97,7 @@ export abstract class Constants {
     public static readonly LOCAL_SEARCHDATA = "local-searchdata";
     public static readonly LOCAL_SEARCHKEYS = "local-searchkeys";
     public static readonly LOCAL_SEARCHASSET = "local-searchasset";
+    public static readonly LOCAL_SEARCHUNREF = "local-searchunref";
     public static readonly LOCAL_DOCINFO = "local-docinfo"; // only mobile
     public static readonly LOCAL_DAILYNOTEID = "local-dailynoteid"; // string
     public static readonly LOCAL_HISTORYNOTEID = "local-historynoteid"; // string
@@ -284,7 +286,7 @@ export abstract class Constants {
     // "⌘", "⇧", "⌥", "⌃"
     // "⌘A", "⌘X", "⌘C", "⌘V", "⌘-", "⌘=", "⌘0", "⇧⌘V", "⌘/", "⇧↑", "⇧↓", "⇧→", "⇧←", "⇧⇥", "⌃D", "⇧⌘→", "⇧⌘←",
     // "⌘Home", "⌘End", "⇧↩", "↩", "PageUp", "PageDown", "⌫", "⌦", "Escape" 不可自定义
-    public static readonly SIYUAN_KEYMAP: IKeymap = {
+    public static readonly SIYUAN_KEYMAP: Config.IKeymap = {
         general: {
             mainMenu: {default: "⌥\\", custom: "⌥\\"},
             commandPanel: {default: "⌥⇧P", custom: "⌥⇧P"},
@@ -341,6 +343,7 @@ export abstract class Constants {
             closeLeft: {default: "", custom: ""},
             closeRight: {default: "", custom: ""},
             tabToWindow: {default: "", custom: ""},
+            addToDatabase: {default: "", custom: ""},
         },
         editor: {
             general: {
@@ -358,6 +361,7 @@ export abstract class Constants {
                 refPopover: {default: "", custom: ""},
                 copyText: {default: "", custom: ""},
                 exitFocus: {default: "", custom: ""},
+                ai: {default: "", custom: ""},
                 switchReadonly: {default: "", custom: ""},
                 expand: {default: "⌘↓", custom: "⌘↓"},
                 collapse: {default: "⌘↑", custom: "⌘↑"},
@@ -393,7 +397,7 @@ export abstract class Constants {
                 insertAfter: {default: "⇧⌘A", custom: "⇧⌘A"},
                 jumpToParentNext: {default: "⇧⌘N", custom: "⇧⌘N"},
                 moveToUp: {default: "⇧⌘↑", custom: "⇧⌘↑"},
-                moveToDown: {default: "⇧⌘↓", custom: "⇧⌘↓"},
+                moveToDown: {default: "⇧⌘↓", custom: "⇧⌘↓"}
             },
             insert: {
                 appearance: {default: "⌥⌘X", custom: "⌥⌘X"},
@@ -447,7 +451,7 @@ export abstract class Constants {
         plugin: {},
     };
 
-    public static readonly SIYUAN_EMPTY_LAYOUT: Record<string, unknown> = {
+    public static readonly SIYUAN_EMPTY_LAYOUT: Config.IUiLayout = {
         hideDock: false,
         layout: {
             "direction": "tb",
@@ -478,7 +482,13 @@ export abstract class Constants {
                     "size": "auto",
                     "type": "center",
                     "instance": "Layout",
-                    "children": [{"instance": "Wnd", "children": [{"instance": "Tab", "children": []}]}]
+                    "children": [{
+                        "instance": "Wnd",
+                        "children": [{
+                            "instance": "Tab",
+                            "children": []
+                        }]
+                    }]
                 }, {
                     "direction": "tb",
                     "size": "0px",
@@ -576,9 +586,7 @@ export abstract class Constants {
         }
     };
 
-    public static readonly SIYUAN_DEFAULT_REPLACETYPES: {
-        [key: string]: boolean;
-    } = {
+    public static readonly SIYUAN_DEFAULT_REPLACETYPES: Required<Config.IUILayoutTabSearchConfigReplaceTypes> = {
         "text": true,
         "imgText": true,
         "imgTitle": true,
@@ -665,6 +673,9 @@ export abstract class Constants {
     // third: "yul", "solidity", "abap", "hlsl", "gdscript"
     public static readonly ALIAS_CODE_LANGUAGES: string[] = [
         "js", "ts", "html", "toml", "c#", "bat",
+    ];
+    public static readonly SIYUAN_RENDER_CODE_LANGUAGES: string[] = [
+        "abc", "plantuml", "mermaid", "flowchart", "echarts", "mindmap", "graphviz", "math"
     ];
 
     // Google Analytics 事件

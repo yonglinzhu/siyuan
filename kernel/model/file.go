@@ -40,6 +40,7 @@ import (
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
 	"github.com/siyuan-note/riff"
+	"github.com/siyuan-note/siyuan/kernel/av"
 	"github.com/siyuan-note/siyuan/kernel/cache"
 	"github.com/siyuan-note/siyuan/kernel/filesys"
 	"github.com/siyuan-note/siyuan/kernel/search"
@@ -490,7 +491,7 @@ func BlocksWordCount(ids []string) (ret *util.BlockStatResult) {
 func StatTree(id string) (ret *util.BlockStatResult) {
 	WaitForWritingFiles()
 
-	tree, _ := loadTreeByBlockID(id)
+	tree, _ := LoadTreeByBlockID(id)
 	if nil == tree {
 		return
 	}
@@ -514,7 +515,7 @@ func GetDoc(startID, endID, id string, index int, query string, queryTypes map[s
 	WaitForWritingFiles() // 写入数据时阻塞，避免获取到的数据不一致
 
 	inputIndex := index
-	tree, err := loadTreeByBlockID(id)
+	tree, err := LoadTreeByBlockID(id)
 	if nil != err {
 		if ErrBlockNotFound == err {
 			if 0 == mode {
@@ -728,6 +729,14 @@ func GetDoc(startID, endID, id string, index int, query string, queryTypes map[s
 				if (0 != mode && id != n.ID) || isDoc {
 					unlinks = append(unlinks, n)
 					return ast.WalkContinue
+				}
+			}
+
+			if avs := n.IALAttr(av.NodeAttrNameAvs); "" != avs {
+				// 填充属性视图角标 Display the database title on the block superscript https://github.com/siyuan-note/siyuan/issues/10545
+				avNames := getAvNames(n.IALAttr(av.NodeAttrNameAvs))
+				if "" != avNames {
+					n.SetIALAttr(av.NodeAttrViewNames, avNames)
 				}
 			}
 
@@ -1066,7 +1075,7 @@ func CreateDailyNote(boxID string) (p string, existed bool, err error) {
 		existed = true
 		p = existRoot.Path
 
-		tree, loadErr := loadTreeByBlockID(existRoot.RootID)
+		tree, loadErr := LoadTreeByBlockID(existRoot.RootID)
 		if nil != loadErr {
 			logging.LogWarnf("load tree by block id [%s] failed: %v", existRoot.RootID, loadErr)
 			return
@@ -1087,26 +1096,28 @@ func CreateDailyNote(boxID string) (p string, existed bool, err error) {
 		return
 	}
 
-	var dom string
+	var templateTree *parse.Tree
+	var templateDom string
 	if "" != boxConf.DailyNoteTemplatePath {
 		tplPath := filepath.Join(util.DataDir, "templates", boxConf.DailyNoteTemplatePath)
 		if !filelock.IsExist(tplPath) {
 			logging.LogWarnf("not found daily note template [%s]", tplPath)
 		} else {
-			dom, err = renderTemplate(tplPath, id, false)
-			if nil != err {
+			var renderErr error
+			templateTree, templateDom, renderErr = RenderTemplate(tplPath, id, false)
+			if nil != renderErr {
 				logging.LogWarnf("render daily note template [%s] failed: %s", boxConf.DailyNoteTemplatePath, err)
 			}
 		}
 	}
-	if "" != dom {
+	if "" != templateDom {
 		var tree *parse.Tree
-		tree, err = loadTreeByBlockID(id)
+		tree, err = LoadTreeByBlockID(id)
 		if nil == err {
 			tree.Root.FirstChild.Unlink()
 
 			luteEngine := util.NewLute()
-			newTree := luteEngine.BlockDOM2Tree(dom)
+			newTree := luteEngine.BlockDOM2Tree(templateDom)
 			var children []*ast.Node
 			for c := newTree.Root.FirstChild; nil != c; c = c.Next {
 				children = append(children, c)
@@ -1114,6 +1125,15 @@ func CreateDailyNote(boxID string) (p string, existed bool, err error) {
 			for _, c := range children {
 				tree.Root.AppendChild(c)
 			}
+
+			// Creating a dailynote template supports doc attributes https://github.com/siyuan-note/siyuan/issues/10698
+			templateIALs := parse.IAL2Map(templateTree.Root.KramdownIAL)
+			for k, v := range templateIALs {
+				if "name" == k || "alias" == k || "bookmark" == k || "memo" == k || strings.HasPrefix(k, "custom-") {
+					tree.Root.SetIALAttr(k, v)
+				}
+			}
+
 			tree.Root.SetIALAttr("updated", util.CurrentTimeSecondsStr())
 			if err = indexWriteJSONQueue(tree); nil != err {
 				return
@@ -1124,7 +1144,7 @@ func CreateDailyNote(boxID string) (p string, existed bool, err error) {
 
 	WaitForWritingFiles()
 
-	tree, err := loadTreeByBlockID(id)
+	tree, err := LoadTreeByBlockID(id)
 	if nil != err {
 		logging.LogErrorf("load tree by block id [%s] failed: %v", id, err)
 		return
@@ -1175,7 +1195,7 @@ func GetHPathsByPaths(paths []string) (hPaths []string, err error) {
 }
 
 func GetHPathByID(id string) (hPath string, err error) {
-	tree, err := loadTreeByBlockID(id)
+	tree, err := LoadTreeByBlockID(id)
 	if nil != err {
 		return
 	}
@@ -1184,7 +1204,7 @@ func GetHPathByID(id string) (hPath string, err error) {
 }
 
 func GetFullHPathByID(id string) (hPath string, err error) {
-	tree, err := loadTreeByBlockID(id)
+	tree, err := LoadTreeByBlockID(id)
 	if nil != err {
 		return
 	}
@@ -1229,6 +1249,16 @@ func MoveDocs(fromPaths []string, toBoxID, toPath string, callback interface{}) 
 
 	pathsBoxes := getBoxesByPaths(fromPaths)
 
+	if 1 == len(fromPaths) {
+		// 移动到自己的父文档下的情况相当于不移动，直接返回
+		if fromBox := pathsBoxes[fromPaths[0]]; nil != fromBox && fromBox.ID == toBoxID {
+			parentDir := path.Dir(fromPaths[0])
+			if ("/" == toPath && "/" == parentDir) || (parentDir+".sy" == toPath) {
+				return
+			}
+		}
+	}
+
 	// 检查路径深度是否超过限制
 	for fromPath, fromBox := range pathsBoxes {
 		childDepth := util.GetChildDocDepth(filepath.Join(util.DataDir, fromBox.ID, fromPath))
@@ -1238,8 +1268,12 @@ func MoveDocs(fromPaths []string, toBoxID, toPath string, callback interface{}) 
 		}
 	}
 
-	// A progress layer appears when moving more than 16 documents at once https://github.com/siyuan-note/siyuan/issues/9356
-	needShowProgress := 16 < len(fromPaths)
+	// A progress layer appears when moving more than 64 documents at once https://github.com/siyuan-note/siyuan/issues/9356
+	subDocsCount := 0
+	for fromPath, fromBox := range pathsBoxes {
+		subDocsCount += countSubDocs(fromBox.ID, fromPath)
+	}
+	needShowProgress := 64 < subDocsCount
 	if needShowProgress {
 		defer util.PushClearProgress()
 	}
@@ -1260,6 +1294,23 @@ func MoveDocs(fromPaths []string, toBoxID, toPath string, callback interface{}) 
 	}
 	cache.ClearDocsIAL()
 	IncSync()
+	return
+}
+
+func countSubDocs(box, p string) (ret int) {
+	p = strings.TrimSuffix(p, ".sy")
+	_ = filepath.Walk(filepath.Join(util.DataDir, box, p), func(path string, info os.FileInfo, err error) error {
+		if nil != err {
+			return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(path, ".sy") {
+			ret++
+		}
+		return nil
+	})
 	return
 }
 
@@ -1517,7 +1568,7 @@ func RenameDoc(boxID, p, title string) (err error) {
 		return
 	}
 	if "" == title {
-		title = "Untitled"
+		title = Conf.language(105)
 	}
 	title = strings.ReplaceAll(title, "/", "")
 
@@ -1553,6 +1604,10 @@ func createDoc(boxID, p, title, dom string) (tree *parse.Tree, err error) {
 		return
 	}
 	title = strings.ReplaceAll(title, "/", "")
+	title = strings.TrimSpace(title)
+	if "" == title {
+		title = Conf.Language(105)
+	}
 
 	baseName := strings.TrimSpace(path.Base(p))
 	if "" == strings.TrimSuffix(baseName, ".sy") {
@@ -1576,7 +1631,7 @@ func createDoc(boxID, p, title, dom string) (tree *parse.Tree, err error) {
 	folder := path.Dir(p)
 	if "/" != folder {
 		parentID := path.Base(folder)
-		parentTree, loadErr := loadTreeByBlockID(parentID)
+		parentTree, loadErr := LoadTreeByBlockID(parentID)
 		if nil != loadErr {
 			logging.LogErrorf("get parent tree [%s] failed", parentID)
 			err = ErrBlockNotFound

@@ -153,6 +153,7 @@ func ListInvalidBlockRefs(page, pageSize int) (ret []*Block, matchedBlockCount, 
 	invalidBlockIDs = gulu.Str.RemoveDuplicatedElem(invalidBlockIDs)
 
 	sort.Strings(invalidBlockIDs)
+	allInvalidBlockIDs := invalidBlockIDs
 
 	start := (page - 1) * pageSize
 	end := page * pageSize
@@ -162,17 +163,26 @@ func ListInvalidBlockRefs(page, pageSize int) (ret []*Block, matchedBlockCount, 
 	invalidBlockIDs = invalidBlockIDs[start:end]
 
 	sqlBlocks := sql.GetBlocks(invalidBlockIDs)
+	var tmp []*sql.Block
+	for _, sqlBlock := range sqlBlocks {
+		if nil != sqlBlock {
+			tmp = append(tmp, sqlBlock)
+		}
+	}
+	sqlBlocks = tmp
+
 	ret = fromSQLBlocks(&sqlBlocks, "", 36)
 	if 1 > len(ret) {
 		ret = []*Block{}
 	}
-	matchedBlockCount = len(ret)
+	matchedBlockCount = len(allInvalidBlockIDs)
 	rootCount := map[string]bool{}
-	for _, block := range ret {
-		if nil == block {
+	for _, id := range allInvalidBlockIDs {
+		bt := treenode.GetBlockTree(id)
+		if nil == bt {
 			continue
 		}
-		rootCount[block.RootID] = true
+		rootCount[bt.RootID] = true
 	}
 	matchedRootCount = len(rootCount)
 	pageCount = (matchedBlockCount + pageSize - 1) / pageSize
@@ -256,7 +266,7 @@ func buildEmbedBlock(embedBlockID string, excludeIDs []string, headingMode int, 
 	count := 0
 	for _, sb := range sqlBlocks {
 		if nil == trees[sb.RootID] {
-			tree, _ := loadTreeByBlockID(sb.RootID)
+			tree, _ := LoadTreeByBlockID(sb.RootID)
 			if nil == tree {
 				continue
 			}
@@ -314,7 +324,7 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets 
 		for _, ref := range refs {
 			tree := cachedTrees[ref.DefBlockRootID]
 			if nil == tree {
-				tree, _ = loadTreeByBlockID(ref.DefBlockRootID)
+				tree, _ = LoadTreeByBlockID(ref.DefBlockRootID)
 			}
 			if nil == tree {
 				continue
@@ -350,7 +360,7 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets 
 	for _, b := range ret {
 		tree := cachedTrees[b.RootID]
 		if nil == tree {
-			tree, _ = loadTreeByBlockID(b.RootID)
+			tree, _ = LoadTreeByBlockID(b.RootID)
 		}
 		if nil == tree {
 			continue
@@ -363,7 +373,7 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets 
 			// `((` 引用候选中排除当前块的父块 https://github.com/siyuan-note/siyuan/issues/4538
 			tree := cachedTrees[b.RootID]
 			if nil == tree {
-				tree, _ = loadTreeByBlockID(b.RootID)
+				tree, _ = LoadTreeByBlockID(b.RootID)
 				cachedTrees[b.RootID] = tree
 			}
 			if nil != tree {
@@ -456,7 +466,7 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 			continue
 		}
 
-		tree, _ = loadTreeByBlockID(id)
+		tree, _ = LoadTreeByBlockID(id)
 		if nil == tree {
 			continue
 		}
@@ -582,7 +592,7 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 					} else if n.IsTextMarkType("a") {
 						if replaceTypes["aText"] {
 							if 0 == method {
-								if bytes.Contains(n.Tokens, []byte(keyword)) {
+								if strings.Contains(n.TextMarkTextContent, keyword) {
 									n.TextMarkTextContent = strings.ReplaceAll(n.TextMarkTextContent, keyword, replacement)
 								}
 							} else if 3 == method {
@@ -810,7 +820,7 @@ func FullTextSearchBlock(query string, boxes, paths []string, types map[string]b
 			if _, ok := rootMap[b.RootID]; !ok {
 				rootMap[b.RootID] = true
 				rootIDs = append(rootIDs, b.RootID)
-				tree, _ := loadTreeByBlockID(b.RootID)
+				tree, _ := LoadTreeByBlockID(b.RootID)
 				if nil == tree {
 					continue
 				}
@@ -961,6 +971,10 @@ func buildTypeFilter(types map[string]bool) string {
 		s.HTMLBlock = types["htmlBlock"]
 		s.EmbedBlock = types["embedBlock"]
 		s.DatabaseBlock = types["databaseBlock"]
+		s.AudioBlock = types["audioBlock"]
+		s.VideoBlock = types["videoBlock"]
+		s.IFrameBlock = types["iFrameBlock"]
+		s.WidgetBlock = types["widgetBlock"]
 	} else {
 		s.Document = Conf.Search.Document
 		s.Heading = Conf.Search.Heading
@@ -975,6 +989,10 @@ func buildTypeFilter(types map[string]bool) string {
 		s.HTMLBlock = Conf.Search.HTMLBlock
 		s.EmbedBlock = Conf.Search.EmbedBlock
 		s.DatabaseBlock = Conf.Search.DatabaseBlock
+		s.AudioBlock = Conf.Search.AudioBlock
+		s.VideoBlock = Conf.Search.VideoBlock
+		s.IFrameBlock = Conf.Search.IFrameBlock
+		s.WidgetBlock = Conf.Search.WidgetBlock
 	}
 	return s.TypeFilter()
 }
@@ -1143,13 +1161,13 @@ func fullTextSearchByFTS(query, boxFilter, pathFilter, typeFilter, orderBy strin
 		table = "blocks_fts_case_insensitive"
 	}
 	projections := "id, parent_id, root_id, hash, box, path, " +
-		// Improve the highlight snippet when search result content is too long https://github.com/siyuan-note/siyuan/issues/9215
-		"snippet(" + table + ", 6, '" + search.SearchMarkLeft + "', '" + search.SearchMarkRight + "', '...', 192) AS hpath, " +
-		"snippet(" + table + ", 7, '" + search.SearchMarkLeft + "', '" + search.SearchMarkRight + "', '...', 192) AS name, " +
-		"snippet(" + table + ", 8, '" + search.SearchMarkLeft + "', '" + search.SearchMarkRight + "', '...', 192) AS alias, " +
-		"snippet(" + table + ", 9, '" + search.SearchMarkLeft + "', '" + search.SearchMarkRight + "', '...', 192) AS memo, " +
+		// Search result content snippet returns more text https://github.com/siyuan-note/siyuan/issues/10707
+		"snippet(" + table + ", 6, '" + search.SearchMarkLeft + "', '" + search.SearchMarkRight + "', '...', 512) AS hpath, " +
+		"snippet(" + table + ", 7, '" + search.SearchMarkLeft + "', '" + search.SearchMarkRight + "', '...', 512) AS name, " +
+		"snippet(" + table + ", 8, '" + search.SearchMarkLeft + "', '" + search.SearchMarkRight + "', '...', 512) AS alias, " +
+		"snippet(" + table + ", 9, '" + search.SearchMarkLeft + "', '" + search.SearchMarkRight + "', '...', 512) AS memo, " +
 		"tag, " +
-		"snippet(" + table + ", 11, '" + search.SearchMarkLeft + "', '" + search.SearchMarkRight + "', '...', 192) AS content, " +
+		"snippet(" + table + ", 11, '" + search.SearchMarkLeft + "', '" + search.SearchMarkRight + "', '...', 512) AS content, " +
 		"fcontent, markdown, length, type, subtype, ial, sort, created, updated"
 	stmt := "SELECT " + projections + " FROM " + table + " WHERE (`" + table + "` MATCH '" + columnFilter() + ":(" + query + ")'"
 	stmt += ") AND type IN " + typeFilter
@@ -1281,7 +1299,20 @@ func fromSQLBlock(sqlBlock *sql.Block, terms string, beforeLen int) (block *Bloc
 	}
 
 	id := sqlBlock.ID
-	content := util.EscapeHTML(sqlBlock.Content) // Search dialog XSS https://github.com/siyuan-note/siyuan/issues/8525
+	content := sqlBlock.Content
+	if 1 < strings.Count(content, search.SearchMarkRight) && strings.HasSuffix(content, search.SearchMarkRight+"...") {
+		// 返回多个关键字命中时需要检查最后一个关键字是否被截断
+		firstKeyword := gulu.Str.SubStringBetween(content, search.SearchMarkLeft, search.SearchMarkRight)
+		lastKeyword := gulu.Str.LastSubStringBetween(content, search.SearchMarkLeft, search.SearchMarkRight)
+		if firstKeyword != lastKeyword {
+			// 如果第一个关键字和最后一个关键字不相同，说明最后一个关键字被截断了
+			// 此时需要将 content 中的最后一个关键字替换为完整的关键字
+			content = strings.TrimSuffix(content, search.SearchMarkLeft+lastKeyword+search.SearchMarkRight+"...")
+			content += search.SearchMarkLeft + firstKeyword + search.SearchMarkRight + "..."
+		}
+	}
+
+	content = util.EscapeHTML(content) // Search dialog XSS https://github.com/siyuan-note/siyuan/issues/8525
 	content, _ = markSearch(content, terms, beforeLen)
 	content = maxContent(content, 5120)
 	markdown := maxContent(sqlBlock.Markdown, 5120)

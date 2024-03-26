@@ -174,18 +174,23 @@ type Criterion struct {
 }
 
 type CriterionTypes struct {
-	MathBlock  bool `json:"mathBlock"`
-	Table      bool `json:"table"`
-	Blockquote bool `json:"blockquote"`
-	SuperBlock bool `json:"superBlock"`
-	Paragraph  bool `json:"paragraph"`
-	Document   bool `json:"document"`
-	Heading    bool `json:"heading"`
-	List       bool `json:"list"`
-	ListItem   bool `json:"listItem"`
-	CodeBlock  bool `json:"codeBlock"`
-	HtmlBlock  bool `json:"htmlBlock"`
-	EmbedBlock bool `json:"embedBlock"`
+	MathBlock     bool `json:"mathBlock"`
+	Table         bool `json:"table"`
+	Blockquote    bool `json:"blockquote"`
+	SuperBlock    bool `json:"superBlock"`
+	Paragraph     bool `json:"paragraph"`
+	Document      bool `json:"document"`
+	Heading       bool `json:"heading"`
+	List          bool `json:"list"`
+	ListItem      bool `json:"listItem"`
+	CodeBlock     bool `json:"codeBlock"`
+	HtmlBlock     bool `json:"htmlBlock"`
+	EmbedBlock    bool `json:"embedBlock"`
+	DatabaseBlock bool `json:"databaseBlock"`
+	AudioBlock    bool `json:"audioBlock"`
+	VideoBlock    bool `json:"videoBlock"`
+	IFrameBlock   bool `json:"iframeBlock"`
+	WidgetBlock   bool `json:"widgetBlock"`
 }
 
 type CriterionReplaceTypes struct {

@@ -47,9 +47,9 @@ export class Wnd {
     public element: HTMLElement;
     public headersElement: HTMLElement;
     public children: Tab[] = [];
-    public resize?: TDirection;
+    public resize?: Config.TUILayoutDirection;
 
-    constructor(app: App, resize?: TDirection, parentType?: TLayout) {
+    constructor(app: App, resize?: Config.TUILayoutDirection, parentType?: Config.TUILayoutType) {
         this.id = genUUID();
         this.app = app;
         this.resize = resize;
@@ -571,7 +571,7 @@ export class Wnd {
         if (this.parent.type === "center" && this.children.length === 2 && !this.children[0].headElement) {
             this.removeTab(this.children[0].id);
         } else if (this.children.length > window.siyuan.config.fileTree.maxOpenTabCount) {
-            this.removeOverCounter(oldFocusIndex);
+            this.removeOverCounter(isSaveLayout);
         }
         /// #if !BROWSER
         setTabPosition();
@@ -641,22 +641,15 @@ export class Wnd {
         });
     }
 
-    private removeOverCounter(oldFocusIndex?: number) {
-        if (typeof oldFocusIndex === "undefined") {
-            this.children.forEach((item, index) => {
-                if (item.headElement && item.headElement.classList.contains("item--focus")) {
-                    oldFocusIndex = index;
-                }
-            });
-        }
+    private removeOverCounter(isSaveLayout = false) {
         let removeId: string;
         let openTime: string;
+        let removeCount = 0;
         this.children.forEach((item, index) => {
-            if (item.headElement.classList.contains("item--pin") ||
-                item.headElement.classList.contains("item--focus") ||
-                index === oldFocusIndex) {
+            if (item.headElement.classList.contains("item--pin") || item.headElement.classList.contains("item--focus")) {
                 return;
             }
+            removeCount++;
             if (!openTime) {
                 openTime = item.headElement.getAttribute("data-activetime");
                 removeId = this.children[index].id;
@@ -666,7 +659,11 @@ export class Wnd {
             }
         });
         if (removeId) {
-            this.removeTab(removeId);
+            this.removeTab(removeId, false, false, isSaveLayout);
+            removeCount--;
+        }
+        if (removeCount > 0 && this.children.length > window.siyuan.config.fileTree.maxOpenTabCount) {
+            this.removeOverCounter(isSaveLayout);
         }
     }
 
@@ -684,9 +681,8 @@ export class Wnd {
             return;
         }
         if (model instanceof Search) {
-            if (model.edit) {
-                model.edit.destroy();
-            }
+            model.editors.edit.destroy();
+            model.editors.unRefEdit.destroy();
             return;
         }
         if (model instanceof Asset) {
@@ -900,7 +896,7 @@ export class Wnd {
         /// #endif
     }
 
-    public split(direction: TDirection) {
+    public split(direction: Config.TUILayoutDirection) {
         if (this.children.length === 1 && !this.children[0].headElement) {
             // 场景：没有打开的文档，点击标签面板打开
             return this;

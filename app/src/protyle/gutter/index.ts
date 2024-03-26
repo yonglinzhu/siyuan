@@ -178,12 +178,12 @@ export class Gutter {
                                     doOperations.push({
                                         action: "setAttrs",
                                         id: listId,
-                                        data: JSON.stringify({fold: hasFold ? "0" : "1"})
+                                        data: JSON.stringify({fold: hasFold ? "" : "1"})
                                     });
                                     undoOperations.push({
                                         action: "setAttrs",
                                         id: listId,
-                                        data: JSON.stringify({fold: hasFold ? "1" : "0"})
+                                        data: JSON.stringify({fold: hasFold ? "1" : ""})
                                     });
                                 }
                             });
@@ -193,9 +193,9 @@ export class Gutter {
                     buttonElement.removeAttribute("disabled");
                 } else {
                     const foldStatus = setFold(protyle, foldElement);
-                    if (foldStatus === "1") {
+                    if (foldStatus === 1) {
                         (buttonElement.firstElementChild as HTMLElement).style.transform = "";
-                    } else if (foldStatus === "0") {
+                    } else if (foldStatus === 0) {
                         (buttonElement.firstElementChild as HTMLElement).style.transform = "rotate(90deg)";
                     }
                 }
@@ -225,18 +225,29 @@ export class Gutter {
                     const avID = blockElement.getAttribute("data-av-id");
                     const srcIDs = [Lute.NewNodeID()];
                     const previousID = event.altKey ? (rowElement.previousElementSibling.getAttribute("data-id") || "") : buttonElement.dataset.rowId;
+                    const newUpdated = dayjs().format("YYYYMMDDHHmmss");
                     transaction(protyle, [{
                         action: "insertAttrViewBlock",
                         avID,
                         previousID,
                         srcIDs,
                         isDetached: true,
+                        blockID: id,
+                    }, {
+                        action: "doUpdateUpdated",
+                        id,
+                        data: newUpdated,
                     }], [{
                         action: "removeAttrViewBlock",
                         srcIDs,
                         avID,
+                    }, {
+                        action: "doUpdateUpdated",
+                        id,
+                        data: blockElement.getAttribute("updated")
                     }]);
                     insertAttrViewBlockAnimation(protyle, blockElement, srcIDs, previousID, avID);
+                    blockElement.setAttribute("updated", newUpdated);
                 } else {
                     avContextmenu(protyle, rowElement as HTMLElement, {
                         x: gutterRect.left,
@@ -286,12 +297,12 @@ export class Gutter {
                             doOperations.push({
                                 action: "setAttrs",
                                 id: listId,
-                                data: JSON.stringify({fold: hasFold ? "0" : "1"})
+                                data: JSON.stringify({fold: hasFold ? "" : "1"})
                             });
                             undoOperations.push({
                                 action: "setAttrs",
                                 id: listId,
-                                data: JSON.stringify({fold: hasFold ? "1" : "0"})
+                                data: JSON.stringify({fold: hasFold ? "1" : ""})
                             });
                         }
                     });
@@ -713,7 +724,14 @@ export class Gutter {
             }
         }
         if (!protyle.disabled) {
-            AIActions(selectsElement, protyle);
+            window.siyuan.menus.menu.append(new MenuItem({
+                icon: "iconSparkles",
+                label: window.siyuan.languages.ai,
+                accelerator: window.siyuan.config.keymap.editor.general.ai.custom,
+                click() {
+                    AIActions(selectsElement, protyle);
+                }
+            }).element);
         }
         const copyMenu: IMenu[] = [{
             label: window.siyuan.languages.copy,
@@ -737,6 +755,7 @@ export class Gutter {
                     });
                 });
                 copyPlainText(html.trimEnd());
+                focusBlock(selectsElement[0]);
             }
         }, {
             label: window.siyuan.languages.duplicate,
@@ -790,6 +809,7 @@ export class Gutter {
         }).element);
         window.siyuan.menus.menu.append(new MenuItem({
             label: window.siyuan.languages.addToDatabase,
+            accelerator: window.siyuan.config.keymap.general.addToDatabase.custom,
             icon: "iconDatabase",
             click: () => {
                 openSearchAV("", selectsElement[0] as HTMLElement, (listItemElement) => {
@@ -802,7 +822,13 @@ export class Gutter {
                         action: "insertAttrViewBlock",
                         avID,
                         srcIDs: sourceIds,
+                        ignoreFillFilter: true,
                         isDetached: false,
+                        blockID: listItemElement.dataset.blockId
+                    }, {
+                        action: "doUpdateUpdated",
+                        id: listItemElement.dataset.blockId,
+                        data: dayjs().format("YYYYMMDDHHmmss"),
                     }], [{
                         action: "removeAttrViewBlock",
                         srcIDs: sourceIds,
@@ -1173,7 +1199,14 @@ export class Gutter {
             }).element);
         }
         if (!protyle.disabled && !nodeElement.classList.contains("hr")) {
-            AIActions([nodeElement], protyle);
+            window.siyuan.menus.menu.append(new MenuItem({
+                icon: "iconSparkles",
+                label: window.siyuan.languages.ai,
+                accelerator: window.siyuan.config.keymap.editor.general.ai.custom,
+                click() {
+                    AIActions([nodeElement], protyle);
+                }
+            }).element);
         }
         const copyMenu = (copySubMenu(id, true, nodeElement) as IMenu[]).concat([{
             label: window.siyuan.languages.copy,
@@ -1195,6 +1228,7 @@ export class Gutter {
                     text += item.textContent + "\n";
                 });
                 copyPlainText(text.trimEnd());
+                focusBlock(nodeElement);
             }
         }, {
             label: window.siyuan.languages.duplicate,
@@ -1242,16 +1276,23 @@ export class Gutter {
             }).element);
             window.siyuan.menus.menu.append(new MenuItem({
                 label: window.siyuan.languages.addToDatabase,
+                accelerator: window.siyuan.config.keymap.general.addToDatabase.custom,
                 icon: "iconDatabase",
                 click: () => {
                     openSearchAV("", nodeElement as HTMLElement, (listItemElement) => {
-                        const sourceIds: string[] = [nodeElement.getAttribute("data-node-id")];
+                        const sourceIds: string[] = [id];
                         const avID = listItemElement.dataset.avId;
                         transaction(protyle, [{
                             action: "insertAttrViewBlock",
                             avID,
                             srcIDs: sourceIds,
+                            ignoreFillFilter: true,
                             isDetached: false,
+                            blockID: listItemElement.dataset.blockId
+                        }, {
+                            action: "doUpdateUpdated",
+                            id: listItemElement.dataset.blockId,
+                            data: dayjs().format("YYYYMMDDHHmmss"),
                         }], [{
                             action: "removeAttrViewBlock",
                             srcIDs: sourceIds,
@@ -1408,7 +1449,8 @@ export class Gutter {
                 label: window.siyuan.languages.export + " CSV",
                 click() {
                     fetchPost("/api/export/exportAttributeView", {
-                        id: nodeElement.getAttribute("data-av-id")
+                        id: nodeElement.getAttribute("data-av-id"),
+                        blockID: id,
                     }, response => {
                         openByMobile(response.data.zip);
                     });
@@ -1705,7 +1747,7 @@ export class Gutter {
                     label: window.siyuan.languages.addToDeck,
                     icon: "iconRiffCard",
                     click() {
-                        makeCard(protyle.app, [nodeElement.getAttribute("data-node-id")]);
+                        makeCard(protyle.app, [id]);
                     }
                 }).element);
             }
