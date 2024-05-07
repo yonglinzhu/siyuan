@@ -182,7 +182,8 @@ func NodeStaticContent(node *ast.Node, excludeTypes []string, includeTextMarkATi
 			return getAttributeViewContent(node.AttributeViewID)
 		}
 
-		return getAttributeViewName(node.AttributeViewID)
+		ret, _ := av.GetAttributeViewName(node.AttributeViewID)
+		return ret
 	}
 
 	buf := bytes.Buffer{}
@@ -545,49 +546,6 @@ func IsChartCodeBlockCode(code *ast.Node) bool {
 	return render.NoHighlight(language)
 }
 
-func GetAttributeViewName(avID string) (name string) {
-	if "" == avID {
-		return
-	}
-
-	attrView, err := av.ParseAttributeView(avID)
-	if nil != err {
-		logging.LogErrorf("parse attribute view [%s] failed: %s", avID, err)
-		return
-	}
-
-	buf := bytes.Buffer{}
-	for _, v := range attrView.Views {
-		buf.WriteString(v.Name)
-		buf.WriteByte(' ')
-	}
-
-	name = strings.TrimSpace(buf.String())
-	return
-}
-
-func getAttributeViewName(avID string) (name string) {
-	if "" == avID {
-		return
-	}
-
-	attrView, err := av.ParseAttributeView(avID)
-	if nil != err {
-		logging.LogErrorf("parse attribute view [%s] failed: %s", avID, err)
-		return
-	}
-
-	buf := bytes.Buffer{}
-	buf.WriteString(attrView.Name)
-	buf.WriteByte(' ')
-	for _, v := range attrView.Views {
-		buf.WriteString(v.Name)
-		buf.WriteByte(' ')
-	}
-	name = strings.TrimSpace(buf.String())
-	return
-}
-
 func getAttributeViewContent(avID string) (content string) {
 	if "" == avID {
 		return
@@ -640,7 +598,7 @@ func getAttributeViewContent(avID string) (content string) {
 			if nil == cell.Value {
 				continue
 			}
-			buf.WriteString(cell.Value.String())
+			buf.WriteString(cell.Value.String(true))
 			buf.WriteByte(' ')
 		}
 	}
@@ -676,6 +634,7 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 			Template:     key.Template,
 			Relation:     key.Relation,
 			Rollup:       key.Rollup,
+			Date:         key.Date,
 			Wrap:         col.Wrap,
 			Hidden:       col.Hidden,
 			Width:        col.Width,
@@ -805,7 +764,12 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 				for _, blockID := range relVal.Relation.BlockIDs {
 					destVal := destAv.GetValue(rollupKey.Rollup.KeyID, blockID)
 					if nil == destVal {
-						continue
+						if destAv.ExistBlock(blockID) { // 数据库中存在行但是列值不存在是数据未初始化，这里补一个默认值
+							destVal = av.GetAttributeViewDefaultValue(ast.NewNodeID(), rollupKey.Rollup.KeyID, blockID, destKey.Type)
+						}
+						if nil == destVal {
+							continue
+						}
 					}
 					if av.KeyTypeNumber == destKey.Type {
 						destVal.Number.Format = destKey.NumberFormat
@@ -906,7 +870,7 @@ func renderAttributeViewTable(attrView *av.AttributeView, view *av.View) (ret *a
 
 func FillAttributeViewTableCellNilValue(tableCell *av.TableCell, rowID, colID string) {
 	if nil == tableCell.Value {
-		tableCell.Value = GetAttributeViewDefaultValue(tableCell.ID, colID, rowID, tableCell.ValueType)
+		tableCell.Value = av.GetAttributeViewDefaultValue(tableCell.ID, colID, rowID, tableCell.ValueType)
 		return
 	}
 
@@ -975,59 +939,6 @@ func FillAttributeViewTableCellNilValue(tableCell *av.TableCell, rowID, colID st
 	}
 }
 
-func GetAttributeViewDefaultValue(valueID, keyID, blockID string, typ av.KeyType) (ret *av.Value) {
-	if "" == valueID {
-		valueID = ast.NewNodeID()
-	}
-
-	ret = &av.Value{ID: valueID, KeyID: keyID, BlockID: blockID, Type: typ}
-
-	createdStr := valueID[:len("20060102150405")]
-	created, parseErr := time.ParseInLocation("20060102150405", createdStr, time.Local)
-	if nil == parseErr {
-		ret.CreatedAt = created.UnixMilli()
-	} else {
-		ret.CreatedAt = time.Now().UnixMilli()
-	}
-	if 0 == ret.UpdatedAt {
-		ret.UpdatedAt = ret.CreatedAt
-	}
-
-	switch typ {
-	case av.KeyTypeText:
-		ret.Text = &av.ValueText{}
-	case av.KeyTypeNumber:
-		ret.Number = &av.ValueNumber{}
-	case av.KeyTypeDate:
-		ret.Date = &av.ValueDate{}
-	case av.KeyTypeSelect:
-		ret.MSelect = []*av.ValueSelect{}
-	case av.KeyTypeMSelect:
-		ret.MSelect = []*av.ValueSelect{}
-	case av.KeyTypeURL:
-		ret.URL = &av.ValueURL{}
-	case av.KeyTypeEmail:
-		ret.Email = &av.ValueEmail{}
-	case av.KeyTypePhone:
-		ret.Phone = &av.ValuePhone{}
-	case av.KeyTypeMAsset:
-		ret.MAsset = []*av.ValueAsset{}
-	case av.KeyTypeTemplate:
-		ret.Template = &av.ValueTemplate{}
-	case av.KeyTypeCreated:
-		ret.Created = &av.ValueCreated{}
-	case av.KeyTypeUpdated:
-		ret.Updated = &av.ValueUpdated{}
-	case av.KeyTypeCheckbox:
-		ret.Checkbox = &av.ValueCheckbox{}
-	case av.KeyTypeRelation:
-		ret.Relation = &av.ValueRelation{}
-	case av.KeyTypeRollup:
-		ret.Rollup = &av.ValueRollup{}
-	}
-	return
-}
-
 func renderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplContent string) string {
 	if "" == ial["id"] {
 		block := getRowBlockValue(rowValues)
@@ -1075,15 +986,52 @@ func renderTemplateCol(ial map[string]string, rowValues []*av.KeyValues, tplCont
 	}
 
 	for _, rowValue := range rowValues {
-		if 0 < len(rowValue.Values) {
-			v := rowValue.Values[0]
-			if av.KeyTypeNumber == v.Type {
+		if 1 > len(rowValue.Values) {
+			continue
+		}
+
+		v := rowValue.Values[0]
+		if av.KeyTypeNumber == v.Type {
+			if nil != v.Number && v.Number.IsNotEmpty {
 				dataModel[rowValue.Key.Name] = v.Number.Content
-			} else if av.KeyTypeDate == v.Type {
-				dataModel[rowValue.Key.Name] = time.UnixMilli(v.Date.Content)
-			} else {
-				dataModel[rowValue.Key.Name] = v.String()
 			}
+		} else if av.KeyTypeDate == v.Type {
+			if nil != v.Date {
+				if v.Date.IsNotEmpty {
+					dataModel[rowValue.Key.Name] = time.UnixMilli(v.Date.Content)
+				}
+				if v.Date.IsNotEmpty2 {
+					dataModel[rowValue.Key.Name+"_end"] = time.UnixMilli(v.Date.Content2)
+				}
+			}
+		} else if av.KeyTypeRollup == v.Type {
+			if 0 < len(v.Rollup.Contents) {
+				var numbers []float64
+				var contents []string
+				for _, content := range v.Rollup.Contents {
+					if av.KeyTypeNumber == content.Type {
+						numbers = append(numbers, content.Number.Content)
+					} else {
+						contents = append(contents, content.String(true))
+					}
+				}
+
+				if 0 < len(numbers) {
+					dataModel[rowValue.Key.Name] = numbers
+				} else {
+					dataModel[rowValue.Key.Name] = contents
+				}
+			}
+		} else if av.KeyTypeRelation == v.Type {
+			if 0 < len(v.Relation.Contents) {
+				var contents []string
+				for _, content := range v.Relation.Contents {
+					contents = append(contents, content.String(true))
+				}
+				dataModel[rowValue.Key.Name] = contents
+			}
+		} else {
+			dataModel[rowValue.Key.Name] = v.String(true)
 		}
 	}
 

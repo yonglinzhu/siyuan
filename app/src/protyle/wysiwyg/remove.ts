@@ -1,17 +1,13 @@
-import {
-    focusBlock,
-    focusByRange,
-    focusByWbr,
-    getSelectionOffset,
-    setLastNodeRange
-} from "../util/selection";
+import {focusBlock, focusByRange, focusByWbr, getSelectionOffset, setLastNodeRange} from "../util/selection";
 import {
     getContenteditableElement,
     getLastBlock,
     getNextBlock,
     getPreviousBlock,
     getTopAloneElement,
-    getTopEmptyElement, hasNextSibling, hasPreviousSibling
+    getTopEmptyElement,
+    hasNextSibling,
+    hasPreviousSibling
 } from "./getBlock";
 import {transaction, turnsIntoTransaction, updateTransaction} from "./transaction";
 import {cancelSB, genEmptyElement} from "../../block/util";
@@ -141,7 +137,8 @@ export const removeBlock = (protyle: IProtyle, blockElement: Element, range: Ran
                 }
                 // https://github.com/siyuan-note/siyuan/issues/5485
                 // https://github.com/siyuan-note/siyuan/issues/10389
-                if (type === "remove" && sideIsNext) {
+                // https://github.com/siyuan-note/siyuan/issues/10899
+                if (type !== "Backspace" && sideIsNext) {
                     focusBlock(sideElement);
                 } else {
                     focusBlock(sideElement, undefined, false);
@@ -174,15 +171,15 @@ export const removeBlock = (protyle: IProtyle, blockElement: Element, range: Ran
         hideElements(["util"], protyle);
         return;
     }
+    const blockType = blockElement.getAttribute("data-type");
     // 空代码块直接删除
-    if (blockElement.getAttribute("data-type") === "NodeCodeBlock" && getContenteditableElement(blockElement).textContent.trim() === "") {
+    if (blockType === "NodeCodeBlock" && getContenteditableElement(blockElement).textContent.trim() === "") {
         blockElement.classList.add("protyle-wysiwyg--select");
         removeBlock(protyle, blockElement, range, type);
         return;
     }
     // 设置 bq 和代码块光标
-    if (blockElement.getAttribute("data-type") === "NodeCodeBlock" ||
-        blockElement.getAttribute("data-type") === "NodeTable") {
+    if (["NodeCodeBlock", "NodeTable", "NodeAttributeView"].includes(blockType)) {
         if (blockElement.previousElementSibling) {
             focusBlock(blockElement.previousElementSibling, undefined, false);
         }
@@ -233,7 +230,7 @@ export const removeBlock = (protyle: IProtyle, blockElement: Element, range: Ran
         removeLi(protyle, blockElement, range, type === "Delete");
         return;
     }
-    if (blockElement.getAttribute("data-type") === "NodeHeading") {
+    if (blockType === "NodeHeading") {
         turnsIntoTransaction({
             protyle: protyle,
             selectsElement: [blockElement],
@@ -416,6 +413,11 @@ export const removeImage = (imgSelectElement: Element, nodeElement: HTMLElement,
     imgSelectElement.remove();
     updateTransaction(protyle, nodeElement.getAttribute("data-node-id"), nodeElement.outerHTML, oldHTML);
     focusByWbr(nodeElement, range);
+    // 不太清楚为什么删除图片后无法上下键定位，但重绘后就好了 https://ld246.com/article/1714314625702
+    const editElement = getContenteditableElement(nodeElement);
+    if (editElement.innerHTML.trim() === "") {
+        editElement.innerHTML = "";
+    }
 };
 
 const removeLi = (protyle: IProtyle, blockElement: Element, range: Range, isDelete = false) => {

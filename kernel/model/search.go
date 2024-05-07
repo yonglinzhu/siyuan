@@ -369,7 +369,7 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets 
 		b.RefText = getBlockRefText(b.ID, tree)
 
 		hitFirstChildID := false
-		if b.IsContainerBlock() {
+		if b.IsContainerBlock() && "NodeDocument" != b.Type {
 			// `((` 引用候选中排除当前块的父块 https://github.com/siyuan-note/siyuan/issues/4538
 			tree := cachedTrees[b.RootID]
 			if nil == tree {
@@ -384,17 +384,22 @@ func SearchRefBlock(id, rootID, keyword string, beforeLen int, isSquareBrackets 
 			}
 		}
 
-		if b.ID != id && !hitFirstChildID && b.ID != rootID {
+		if "NodeAttributeView" == b.Type {
+			// 数据库块可以添加到自身数据库块中，当前文档也可以添加到自身数据库块中
 			tmp = append(tmp, b)
+		} else {
+			// 排除自身块、父块和根块
+			if b.ID != id && !hitFirstChildID && b.ID != rootID {
+				tmp = append(tmp, b)
+			}
 		}
+
 	}
 	ret = tmp
 
-	if "" != keyword {
-		if block := treenode.GetBlockTree(id); nil != block {
-			p := path.Join(block.HPath, keyword)
-			newDoc = nil == treenode.GetBlockTreeRootByHPath(block.BoxID, p)
-		}
+	if block := treenode.GetBlockTree(id); nil != block {
+		p := path.Join(block.HPath, keyword)
+		newDoc = nil == treenode.GetBlockTreeRootByHPath(block.BoxID, p)
 	}
 
 	// 在 hPath 中加入笔记本名 Show notebooks in hpath of block ref search list results https://github.com/siyuan-note/siyuan/issues/9378
@@ -424,6 +429,7 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 
 	if 0 != groupBy {
 		// 按文档分组后不支持替换 Need to be reminded that replacement operations are not supported after grouping by doc https://github.com/siyuan-note/siyuan/issues/10161
+		// 因为分组条件传入以后搜索只能命中文档块，会导致 全部替换 失效
 		err = errors.New(Conf.Language(221))
 		return
 	}
@@ -516,16 +522,20 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 			title := node.IALAttr("title")
 			if 0 == method {
 				if strings.Contains(title, keyword) {
-					renameRootTitles[node.ID] = strings.ReplaceAll(title, keyword, replacement)
+					docTitleReplacement := strings.ReplaceAll(replacement, "/", "")
+					renameRootTitles[node.ID] = strings.ReplaceAll(title, keyword, docTitleReplacement)
 					renameRoots = append(renameRoots, node)
 				}
 			} else if 3 == method {
 				if nil != r && r.MatchString(title) {
-					renameRootTitles[node.ID] = r.ReplaceAllString(title, replacement)
+					docTitleReplacement := strings.ReplaceAll(replacement, "/", "")
+					renameRootTitles[node.ID] = r.ReplaceAllString(title, docTitleReplacement)
 					renameRoots = append(renameRoots, node)
 				}
 			}
 		} else {
+			luteEngine := util.NewLute()
+			var unlinks []*ast.Node
 			ast.Walk(node, func(n *ast.Node, entering bool) ast.WalkStatus {
 				if !entering {
 					return ast.WalkContinue
@@ -537,7 +547,9 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 						return ast.WalkContinue
 					}
 
-					replaceNodeTokens(n, method, keyword, replacement, r)
+					if replaceTextNode(n, method, keyword, replacement, r, luteEngine) {
+						unlinks = append(unlinks, n)
+					}
 				case ast.NodeLinkDest:
 					if !replaceTypes["imgSrc"] {
 						return ast.WalkContinue
@@ -720,7 +732,11 @@ func FindReplace(keyword, replacement string, replaceTypes map[string]bool, ids 
 				return ast.WalkContinue
 			})
 
-			if err = writeJSONQueue(tree); nil != err {
+			for _, unlink := range unlinks {
+				unlink.Unlink()
+			}
+
+			if err = writeTreeUpsertQueue(tree); nil != err {
 				return
 			}
 		}
@@ -755,6 +771,50 @@ func replaceNodeTextMarkTextContent(n *ast.Node, method int, keyword string, rep
 			n.TextMarkTextContent = r.ReplaceAllString(n.TextMarkTextContent, replacement)
 		}
 	}
+}
+
+// replaceTextNode 替换文本节点为其他节点。
+// Supports replacing text elements with other elements https://github.com/siyuan-note/siyuan/issues/11058
+func replaceTextNode(text *ast.Node, method int, keyword string, replacement string, r *regexp.Regexp, luteEngine *lute.Lute) bool {
+	if 0 == method {
+		if bytes.Contains(text.Tokens, []byte(keyword)) {
+			newContent := bytes.ReplaceAll(text.Tokens, []byte(keyword), []byte(replacement))
+			tree := parse.Inline("", newContent, luteEngine.ParseOptions)
+			if nil == tree.Root.FirstChild {
+				return false
+			}
+			parse.NestedInlines2FlattedSpans(tree, false)
+
+			var replaceNodes []*ast.Node
+			for rNode := tree.Root.FirstChild.FirstChild; nil != rNode; rNode = rNode.Next {
+				replaceNodes = append(replaceNodes, rNode)
+			}
+
+			for _, rNode := range replaceNodes {
+				text.InsertBefore(rNode)
+			}
+			return true
+		}
+	} else if 3 == method {
+		if nil != r && r.MatchString(string(text.Tokens)) {
+			newContent := bytes.ReplaceAll(text.Tokens, []byte(keyword), []byte(replacement))
+			tree := parse.Inline("", newContent, luteEngine.ParseOptions)
+			if nil == tree.Root.FirstChild {
+				return false
+			}
+
+			var replaceNodes []*ast.Node
+			for rNode := tree.Root.FirstChild.FirstChild; nil != rNode; rNode = rNode.Next {
+				replaceNodes = append(replaceNodes, rNode)
+			}
+
+			for _, rNode := range replaceNodes {
+				text.InsertBefore(rNode)
+			}
+			return true
+		}
+	}
+	return false
 }
 
 func replaceNodeTokens(n *ast.Node, method int, keyword string, replacement string, r *regexp.Regexp) {
@@ -973,7 +1033,7 @@ func buildTypeFilter(types map[string]bool) string {
 		s.DatabaseBlock = types["databaseBlock"]
 		s.AudioBlock = types["audioBlock"]
 		s.VideoBlock = types["videoBlock"]
-		s.IFrameBlock = types["iFrameBlock"]
+		s.IFrameBlock = types["iframeBlock"]
 		s.WidgetBlock = types["widgetBlock"]
 	} else {
 		s.Document = Conf.Search.Document
@@ -1044,8 +1104,8 @@ func removeLimitClause(stmt string) string {
 func fullTextSearchRefBlock(keyword string, beforeLen int, onlyDoc bool) (ret []*Block) {
 	keyword = filterQueryInvisibleChars(keyword)
 
-	if ast.IsNodeIDPattern(keyword) {
-		ret, _, _ = searchBySQL("SELECT * FROM `blocks` WHERE `id` = '"+keyword+"'", 36, 1, 32)
+	if id := extractID(keyword); "" != id {
+		ret, _, _ = searchBySQL("SELECT * FROM `blocks` WHERE `id` = '"+id+"'", 36, 1, 32)
 		return
 	}
 
@@ -1101,6 +1161,23 @@ func fullTextSearchRefBlock(keyword string, beforeLen int, onlyDoc bool) (ret []
 	ret = fromSQLBlocks(&blocks, "", beforeLen)
 	if 1 > len(ret) {
 		ret = []*Block{}
+	}
+	return
+}
+
+func extractID(content string) (ret string) {
+	// Improve block ref search ID extraction https://github.com/siyuan-note/siyuan/issues/10848
+
+	if 22 > len(content) {
+		return
+	}
+
+	// 从第一个字符开始循环，直到找到一个合法的 ID 为止
+	for i := 0; i < len(content)-21; i++ {
+		if ast.IsNodeIDPattern(content[i : i+22]) {
+			ret = content[i : i+22]
+			return
+		}
 	}
 	return
 }
@@ -1316,7 +1393,7 @@ func fromSQLBlock(sqlBlock *sql.Block, terms string, beforeLen int) (block *Bloc
 	content, _ = markSearch(content, terms, beforeLen)
 	content = maxContent(content, 5120)
 	markdown := maxContent(sqlBlock.Markdown, 5120)
-
+	fContent := util.EscapeHTML(sqlBlock.FContent) // fContent 会用于和 content 对比，在反链计算时用于判断是否是列表项下第一个子块，所以也需要转义 https://github.com/siyuan-note/siyuan/issues/11001
 	block = &Block{
 		Box:      sqlBlock.Box,
 		Path:     sqlBlock.Path,
@@ -1328,7 +1405,7 @@ func fromSQLBlock(sqlBlock *sql.Block, terms string, beforeLen int) (block *Bloc
 		Memo:     sqlBlock.Memo,
 		Tag:      sqlBlock.Tag,
 		Content:  content,
-		FContent: sqlBlock.FContent,
+		FContent: fContent,
 		Markdown: markdown,
 		Type:     treenode.FromAbbrType(sqlBlock.Type),
 		SubType:  sqlBlock.SubType,

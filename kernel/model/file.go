@@ -17,6 +17,7 @@
 package model
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"os"
@@ -29,13 +30,13 @@ import (
 	"time"
 	"unicode/utf8"
 
+	"github.com/88250/go-humanize"
 	"github.com/88250/gulu"
 	"github.com/88250/lute"
 	"github.com/88250/lute/ast"
 	"github.com/88250/lute/html"
 	"github.com/88250/lute/parse"
 	util2 "github.com/88250/lute/util"
-	"github.com/dustin/go-humanize"
 	"github.com/facette/natsort"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/logging"
@@ -89,7 +90,7 @@ func (box *Box) docFromFileInfo(fileInfo *FileInfo, ial map[string]string) (ret 
 	t, _ := time.ParseInLocation("20060102150405", ret.ID[:14], time.Local)
 	ret.CTime = t.Unix()
 	ret.HCtime = t.Format("2006-01-02 15:04:05")
-	ret.HSize = humanize.Bytes(ret.Size)
+	ret.HSize = humanize.BytesCustomCeil(ret.Size, 2)
 
 	mTime := t
 	if updated := ial["updated"]; "" != updated {
@@ -447,6 +448,10 @@ func ListDocTree(boxID, listPath string, sortMode int, flashcard, showHidden boo
 
 func ContentStat(content string) (ret *util.BlockStatResult) {
 	luteEngine := util.NewLute()
+	return contentStat(content, luteEngine)
+}
+
+func contentStat(content string, luteEngine *lute.Lute) (ret *util.BlockStatResult) {
 	tree := luteEngine.BlockDOM2Tree(content)
 	runeCnt, wordCnt, linkCnt, imgCnt, refCnt := tree.Root.Stat()
 	return &util.BlockStatResult{
@@ -478,6 +483,10 @@ func BlocksWordCount(ids []string) (ret *util.BlockStatResult) {
 		}
 
 		node := treenode.GetNodeInTree(tree, id)
+		if nil == node {
+			continue
+		}
+
 		runeCnt, wordCnt, linkCnt, imgCnt, refCnt := node.Stat()
 		ret.RuneCount += runeCnt
 		ret.WordCount += wordCnt
@@ -496,7 +505,94 @@ func StatTree(id string) (ret *util.BlockStatResult) {
 		return
 	}
 
+	var databaseBlockNodes []*ast.Node
+	ast.Walk(tree.Root, func(n *ast.Node, entering bool) ast.WalkStatus {
+		if !entering || ast.NodeAttributeView != n.Type {
+			return ast.WalkContinue
+		}
+
+		databaseBlockNodes = append(databaseBlockNodes, n)
+		return ast.WalkContinue
+	})
+
+	luteEngine := util.NewLute()
+	var dbRuneCnt, dbWordCnt, dbLinkCnt, dbImgCnt, dbRefCnt int
+	for _, n := range databaseBlockNodes {
+		if "" == n.AttributeViewID {
+			continue
+		}
+
+		attrView, _ := av.ParseAttributeView(n.AttributeViewID)
+		if nil == attrView {
+			continue
+		}
+
+		content := bytes.Buffer{}
+		for _, kValues := range attrView.KeyValues {
+			for _, v := range kValues.Values {
+				switch kValues.Key.Type {
+				case av.KeyTypeURL:
+					if v.IsEmpty() {
+						continue
+					}
+
+					dbLinkCnt++
+					content.WriteString(v.URL.Content)
+				case av.KeyTypeMAsset:
+					if v.IsEmpty() {
+						continue
+					}
+
+					for _, asset := range v.MAsset {
+						if av.AssetTypeImage == asset.Type {
+							dbImgCnt++
+						}
+					}
+				case av.KeyTypeBlock:
+					if v.IsEmpty() {
+						continue
+					}
+
+					if !v.IsDetached {
+						dbRefCnt++
+					}
+					content.WriteString(v.Block.Content)
+				case av.KeyTypeText:
+					if v.IsEmpty() {
+						continue
+					}
+					content.WriteString(v.Text.Content)
+				case av.KeyTypeNumber:
+					if v.IsEmpty() {
+						continue
+					}
+					v.Number.FormatNumber()
+					content.WriteString(v.Number.FormattedContent)
+				case av.KeyTypeEmail:
+					if v.IsEmpty() {
+						continue
+					}
+					content.WriteString(v.Email.Content)
+				case av.KeyTypePhone:
+					if v.IsEmpty() {
+						continue
+					}
+					content.WriteString(v.Phone.Content)
+				}
+			}
+		}
+
+		dbStat := contentStat(content.String(), luteEngine)
+		dbRuneCnt += dbStat.RuneCount
+		dbWordCnt += dbStat.WordCount
+	}
+
 	runeCnt, wordCnt, linkCnt, imgCnt, refCnt := tree.Root.Stat()
+	runeCnt += dbRuneCnt
+	wordCnt += dbWordCnt
+	linkCnt += dbLinkCnt
+	imgCnt += dbImgCnt
+	refCnt += dbRefCnt
 	return &util.BlockStatResult{
 		RuneCount:  runeCnt,
 		WordCount:  wordCnt,
@@ -968,7 +1064,7 @@ func loadNodesByMode(node *ast.Node, inputIndex, mode, size int, isDoc, isHeadin
 	return
 }
 
-func writeJSONQueue(tree *parse.Tree) (err error) {
+func writeTreeUpsertQueue(tree *parse.Tree) (err error) {
 	if err = filesys.WriteTree(tree); nil != err {
 		return
 	}
@@ -976,9 +1072,22 @@ func writeJSONQueue(tree *parse.Tree) (err error) {
 	return
 }
 
-func indexWriteJSONQueue(tree *parse.Tree) (err error) {
+func writeTreeIndexQueue(tree *parse.Tree) (err error) {
+	if err = filesys.WriteTree(tree); nil != err {
+		return
+	}
+	sql.IndexTreeQueue(tree)
+	return
+}
+
+func indexWriteTreeIndexQueue(tree *parse.Tree) (err error) {
 	treenode.IndexBlockTree(tree)
-	return writeJSONQueue(tree)
+	return writeTreeIndexQueue(tree)
+}
+
+func indexWriteTreeUpsertQueue(tree *parse.Tree) (err error) {
+	treenode.IndexBlockTree(tree)
+	return writeTreeUpsertQueue(tree)
 }
 
 func renameWriteJSONQueue(tree *parse.Tree) (err error) {
@@ -1084,7 +1193,7 @@ func CreateDailyNote(boxID string) (p string, existed bool, err error) {
 		date := time.Now().Format("20060102")
 		if tree.Root.IALAttr("custom-dailynote-"+date) == "" {
 			tree.Root.SetIALAttr("custom-dailynote-"+date, date)
-			if err = indexWriteJSONQueue(tree); nil != err {
+			if err = indexWriteTreeUpsertQueue(tree); nil != err {
 				return
 			}
 		}
@@ -1135,7 +1244,7 @@ func CreateDailyNote(boxID string) (p string, existed bool, err error) {
 			}
 
 			tree.Root.SetIALAttr("updated", util.CurrentTimeSecondsStr())
-			if err = indexWriteJSONQueue(tree); nil != err {
+			if err = indexWriteTreeUpsertQueue(tree); nil != err {
 				return
 			}
 		}
@@ -1152,7 +1261,7 @@ func CreateDailyNote(boxID string) (p string, existed bool, err error) {
 	p = tree.Path
 	date := time.Now().Format("20060102")
 	tree.Root.SetIALAttr("custom-dailynote-"+date, date)
-	if err = indexWriteJSONQueue(tree); nil != err {
+	if err = indexWriteTreeUpsertQueue(tree); nil != err {
 		return
 	}
 

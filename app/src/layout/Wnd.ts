@@ -1,6 +1,7 @@
 import {Layout} from "./index";
 import {genUUID} from "../util/genID";
 import {
+    fixWndFlex1,
     getInstanceById,
     getWndByLayout, JSONToCenter,
     newModelByInitData, pdfIsLoading, saveLayout,
@@ -39,6 +40,8 @@ import {setTitle} from "../dialog/processSystem";
 import {newCenterEmptyTab, resizeTabs} from "./tabUtil";
 import {fullscreen} from "../protyle/breadcrumb/action";
 import {setPadding} from "../protyle/ui/initUI";
+import {setPosition} from "../util/setPosition";
+import {clearOBG} from "./dock/util";
 
 export class Wnd {
     private app: App;
@@ -496,13 +499,7 @@ export class Wnd {
                 setPadding(currentTab.model.editor.protyle);
             }
         } else {
-            updatePanelByEditor({
-                protyle: undefined,
-                focus: false,
-                pushBackStack: false,
-                reload: false,
-                resize,
-            });
+            clearOBG();
         }
         if (isSaveLayout) {
             saveLayout();
@@ -617,6 +614,7 @@ export class Wnd {
                             this.removeTab(item.getAttribute("data-id"));
                             if (element.previousElementSibling || element.nextElementSibling) {
                                 element.remove();
+                                setPosition(window.siyuan.menus.menu.element, rect.left + rect.width - window.siyuan.menus.menu.element.clientWidth, rect.top + rect.height);
                             } else {
                                 window.siyuan.menus.menu.remove();
                             }
@@ -719,13 +717,7 @@ export class Wnd {
                     // 关闭分屏页签后光标消失
                     const editors = getAllModels().editor;
                     if (editors.length === 0) {
-                        updatePanelByEditor({
-                            protyle: undefined,
-                            focus: true,
-                            pushBackStack: false,
-                            reload: false,
-                            resize: true,
-                        });
+                        clearOBG();
                     } else {
                         editors.forEach(item => {
                             if (!item.element.classList.contains("fn__none")) {
@@ -974,13 +966,6 @@ export class Wnd {
                         }
                         previous.resize = undefined;
                         previous.element.classList.add("fn__flex-1");
-                    } else if (!previous.element.classList.contains("fn__flex-1")) {
-                        // 分屏后要均分 https://github.com/siyuan-note/siyuan/issues/5657
-                        if (layout.direction === "lr") {
-                            previous.element.style.width = (previous.element.clientWidth + element.clientWidth) + "px";
-                        } else {
-                            previous.element.style.height = (previous.element.clientHeight + element.clientHeight) + "px";
-                        }
                     }
                     // https://github.com/siyuan-note/siyuan/issues/5844
                     if (layout.children.length > 2 && index === 0) {
@@ -997,6 +982,7 @@ export class Wnd {
             element.nextElementSibling.remove();
         }
         element.remove();
+        fixWndFlex1(layout);
         resizeTabs();
     }
 }

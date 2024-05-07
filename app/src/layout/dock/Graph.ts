@@ -319,7 +319,7 @@ export class Graph extends Model {
                         target.previousElementSibling.classList.remove("fn__none");
                         (target.previousElementSibling as HTMLInputElement).select();
                     } else if (dataType === "refresh") {
-                        this.searchGraph(false);
+                        this.searchGraph(false, undefined, true);
                     } else if (dataType === "fullscreen") {
                         fullscreen(this.element, target);
                     }
@@ -406,7 +406,7 @@ export class Graph extends Model {
         this.searchGraph(false);
     }
 
-    public searchGraph(focus: boolean, id?: string) {
+    public searchGraph(focus: boolean, id?: string, refresh = false) {
         const element = this.element.querySelector('.block__icon[data-type="refresh"] svg');
         if (element.classList.contains("fn__rotate") && !id) {
             return;
@@ -465,9 +465,7 @@ export class Graph extends Model {
                 if (id) {
                     this.blockId = id;
                 }
-                if (!isCurrentEditor(this.blockId) &&
-                    this.graphElement.firstElementChild.classList.contains("fn__none") // 引用右键打开关系图
-                ) {
+                if (!refresh && this.type === "pin" && this.blockId && !isCurrentEditor(this.blockId)) {
                     return;
                 }
                 this.graphData = response.data;
@@ -551,6 +549,13 @@ export class Graph extends Model {
         clearTimeout(this.timeout);
         addScript(`${Constants.PROTYLE_CDN}/js/vis/vis-network.min.js?v=9.1.2`, "protyleVisScript").then(() => {
             this.timeout = window.setTimeout(() => {
+                if (!this.graphData || !this.graphData.nodes || this.graphData.nodes.length === 0) {
+                    if (this.network) {
+                        this.network.destroy();
+                    }
+                    this.graphElement.firstElementChild.classList.add("fn__none");
+                    return;
+                }
                 this.graphElement.firstElementChild.classList.remove("fn__none");
                 this.graphElement.firstElementChild.firstElementChild.setAttribute("style", "width:3%");
                 const config = window.siyuan.config.graph[this.type === "global" ? "global" : "local"];

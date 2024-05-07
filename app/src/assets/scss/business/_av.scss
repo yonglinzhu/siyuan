@@ -8,8 +8,14 @@
     opacity: 1;
   }
 
+  &__cursor {
+    width: .1px;
+    height: 0;
+  }
+
   &__container {
     overflow: auto;
+    cursor: auto;
   }
 
   &__pulse {
@@ -40,16 +46,35 @@
 
     .layout-tab-bar {
       background-color: transparent;
-      font-size: 87.5%;
+
+      .item__graphic {
+        height: calc(1.625em - 10px);
+        width: calc(1.625em - 10px);
+        padding: 10px 5px 10px 8px;
+        line-height: calc(1.625em - 10px);
+        font-size: inherit;
+        text-align: center;
+      }
+
+      .item__text {
+        padding-left: 5px;
+        line-height: normal;
+      }
     }
   }
 
   &__views {
     align-items: center;
     box-shadow: 0 -1px inset var(--b3-theme-background-light);
+    font-size: 87.5%;
 
     &--show .block__icon {
       opacity: 1;
+    }
+
+    .block__icon svg {
+      height: 1em;
+      width: 1em;
     }
 
     .b3-text-field {
@@ -64,13 +89,6 @@
     &:empty::after {
       color: var(--b3-theme-on-surface);
       content: attr(data-tip);
-    }
-
-    &--hide {
-      width: .1px;
-      overflow: hidden;
-      height: 0;
-      min-height: .1px !important;
     }
   }
 
@@ -107,9 +125,11 @@
 
     &.dragover__bottom {
       border-bottom-color: var(--b3-theme-primary-lighter);
+      z-index: 3;
     }
 
     &.dragover__top {
+      z-index: 3;
       box-shadow: 0 -3px 0 var(--b3-theme-primary-lighter), inset 0 2px 0 var(--b3-theme-primary-lighter) !important;
     }
 
@@ -131,6 +151,11 @@
 
     &--header {
       z-index: 3;
+
+      & > .block__icons > .block__icon svg {
+        height: 1em;
+        width: 1em;
+      }
     }
 
     &--header,
@@ -167,14 +192,19 @@
         white-space: nowrap;
         cursor: pointer;
 
+        &:first-child {
+          padding-left: 1.625em;
+          box-sizing: initial;
+        }
+
         &.av__calc--ashow {
           opacity: 1;
         }
 
         svg {
-          height: 8px;
-          width: 8px;
           margin-left: 5px;
+          height: 1.625em;
+          width: calc(1.625em - 10px);
         }
 
         span {
@@ -193,7 +223,7 @@
       display: flex;
 
       .b3-button {
-        margin: 3px 0 3px 24px;
+        margin: 5px 0 5px 1.625em;
         color: var(--b3-theme-on-surface);
         background-color: transparent;
         font-size: 75%;
@@ -206,8 +236,8 @@
       }
 
       svg {
-        width: 12px;
-        height: 20px;
+        height: 1.625em;
+        width: calc(1.625em - 8px);
 
         &[data-type="set-page-size"] {
           margin: 0 0 0 4px;
@@ -225,7 +255,7 @@
   &__cell {
     box-sizing: border-box;
     position: relative;
-    padding: 5px;
+    padding: 5px 8px;
     flex-shrink: 0;
     border-right: 1px solid var(--b3-theme-surface-lighter);
     overflow: hidden;
@@ -256,6 +286,11 @@
       border-right-color: var(--b3-theme-primary-lighter);
     }
 
+    &.dragover__left,
+    &.dragover__right {
+      z-index: 2;
+    }
+
     &--select {
       background-color: var(--b3-menu-background);
       box-shadow: 2px 2px 0 var(--b3-theme-primary-lighter) inset, -2px -2px 0 var(--b3-theme-primary-lighter) inset;
@@ -267,10 +302,9 @@
     }
 
     &--header {
-      padding: 5px;
+      padding: 5px 8px;
       display: flex;
       align-items: center;
-      transition: background 20ms ease-in 0s;
       overflow: inherit; // 保证列宽和顺序调整的拖拽点样式
       border-right-color: transparent;
 
@@ -283,19 +317,23 @@
         text-overflow: ellipsis;
       }
 
+      img.av__cellheadericon {
+        height: calc(1.625em - 10px);
+      }
+
       .av__cellheadericon {
-        height: 1em;
-        width: 1em;
+        height: 1.625em;
+        width: calc(1.625em - 10px);
         color: var(--b3-theme-on-surface);
         margin: 0 5px 0 0;
         flex-shrink: 0;
-        line-height: 1em;
         font-size: inherit;
 
         &--pin {
           margin: 0 0 0 5px;
         }
       }
+
     }
 
     .block__icon {
@@ -312,6 +350,8 @@
     .b3-chip {
       margin: 1px 2px;
       padding: 2px 6px;
+      line-height: calc(1.625em - 6px);
+      font-size: inherit;
     }
   }
 
@@ -342,7 +382,7 @@
       text-overflow: ellipsis;
       display: inline-block;
       vertical-align: top;
-      height: 20px;
+      border-bottom: 0;
     }
 
     & > .av__cellicon {
@@ -354,10 +394,11 @@
 
   &__checkbox {
     color: var(--b3-theme-on-surface);
-    height: 14px;
-    width: 14px;
-    vertical-align: bottom;
-    padding: 4.5px 0;
+    height: 1.625em;
+    width: calc(1.625em - 10px);
+    box-sizing: border-box;
+    padding: 5px 0;
+    display: block;
 
     &:hover {
       color: var(--b3-theme-on-background);
@@ -368,7 +409,7 @@
     svg {
       @extend .av__checkbox;
       opacity: 0;
-      padding: 9.5px 5px;
+      margin: 5px;
       cursor: pointer;
     }
 
@@ -395,7 +436,7 @@
     width: 5px;
     height: 100%;
     right: -2.5px;
-    transition: background 20ms ease-in 0s;
+    transition: var(--b3-background-transition);
     z-index: 1;
 
     &:hover {
@@ -455,6 +496,11 @@
 
       &__item {
         transition: margin .2s cubic-bezier(0, 0, .2, 1) 0ms;
+
+        &[disabled] {
+          opacity: .38;
+          cursor: not-allowed;
+        }
       }
 
       &__item:hover .b3-menu__action {
@@ -473,8 +519,7 @@
   }
 }
 
-.protyle-wysiwyg--select,
-.protyle-wysiwyg--hl {
+.protyle-wysiwyg--select {
   .av__row--header,
   .av__row--footer,
   .av__row--footer .av__colsticky,
@@ -488,30 +533,38 @@
   }
 }
 
+.protyle-wysiwyg--hl {
+  .av__row--header,
+  .av__row--footer,
+  .av__row--footer .av__colsticky,
+  .av__row--select .av__cell,
+  .av__colsticky.av__firstcol,
+  .av__colsticky > div,
+  .av__cell--select,
+  .av__cell--active,
+  .av__counter {
+    background-color: var(--b3-av-background-hl) !important;
+    transition: var(--b3-background-transition);
+  }
+}
+
 .dragover__top,
 .dragover__bottom {
   .av__colsticky {
-    z-index: 0;
-
-    & > div {
+    &.av__firstcol,
+    & > div:not(.av__cell--select):not(.av__cell--active):not(.av__calc--ashow) {
       background-color: transparent;
     }
   }
 }
 
-.dragover__bottom + .av__row,
-.av__row:has(+ .dragover__top) {
-  .av__colsticky > div {
-    background-color: transparent;
-  }
-}
-
 img.av__cellassetimg {
-  max-height: 20px;
+  max-height: calc(1.625em - 2px);
   border-radius: var(--b3-border-radius);
   margin: 1px 2px;
   max-width: none;
   vertical-align: top;
+  font-size: inherit;
 }
 
 html[data-theme-mode="dark"] .av__panel .b3-menu__item[draggable="true"] {

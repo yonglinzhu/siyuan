@@ -5,6 +5,7 @@ import {fetchPost} from "../util/fetch";
 import {Protyle} from "../protyle";
 import {setPanelFocus} from "../layout/util";
 import {App} from "../index";
+import {clearOBG} from "../layout/dock/util";
 
 export const newCardModel = (options: {
     app: App,
@@ -44,7 +45,7 @@ export const newCardModel = (options: {
                     cardsData: options.data.cardsData,
                     index: options.data.index,
                 });
-                this.data.editor = editor;
+                customObj.editors.push(editor);
                 // https://github.com/siyuan-note/siyuan/issues/9561#issuecomment-1794473512
                 delete options.data.cardsData;
                 delete options.data.index;
@@ -74,7 +75,8 @@ export const newCardModel = (options: {
                         cardType: this.data.cardType,
                         cardsData,
                     });
-                    customObj.data.editor = editor;
+
+                    customObj.editors.push(editor);
                 });
             }
         },
@@ -108,6 +110,7 @@ export const newCardModel = (options: {
         }
     });
     customObj.element.addEventListener("click", () => {
+        clearOBG();
         setPanelFocus(customObj.element.parentElement.parentElement);
     });
     return customObj;

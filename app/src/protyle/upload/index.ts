@@ -8,7 +8,7 @@ import {pathPosix} from "../../util/pathName";
 import {genAssetHTML} from "../../asset/renderAssets";
 import {hasClosestBlock} from "../util/hasClosest";
 import {getContenteditableElement} from "../wysiwyg/getBlock";
-import {updateCellsValue} from "../render/av/cell";
+import {getTypeByCellElement, updateCellsValue} from "../render/av/cell";
 
 export class Upload {
     public element: HTMLElement;
@@ -143,16 +143,50 @@ const genUploadedLabel = (responseText: string, protyle: IProtyle) => {
             }
         }
     });
+
     if ((nodeElement && nodeElement.classList.contains("av"))) {
-        updateCellsValue(protyle, nodeElement, avAssets);
-        document.querySelector(".av__panel")?.remove();
-        return;
-    }
-    if (document.querySelector(".av__panel")) {
-        const blockElement = hasClosestBlock(protyle.wysiwyg.element.querySelector(".av__cell--select"));
-        if (blockElement) {
-            updateCellsValue(protyle, blockElement, avAssets);
+        const cellElements: HTMLElement[] = [];
+        nodeElement.querySelectorAll(".av__row--select:not(.av__row--header)").forEach(item => {
+            item.querySelectorAll(".av__cell").forEach((cellItem: HTMLElement) => {
+                if (getTypeByCellElement(cellItem) === "mAsset") {
+                    cellElements.push(cellItem);
+                }
+            });
+        });
+        if (cellElements.length === 0) {
+            protyle.wysiwyg.element.querySelectorAll(".av__cell--active").forEach((item: HTMLElement) => {
+                if (getTypeByCellElement(item) === "mAsset") {
+                    cellElements.push(item);
+                }
+            });
+        }
+        if (cellElements.length > 0) {
+            updateCellsValue(protyle, nodeElement, avAssets, cellElements);
             document.querySelector(".av__panel")?.remove();
+            return;
+        } else {
+            return;
+        }
+    }
+
+    if (document.querySelector(".av__panel")) {
+        const cellElements: HTMLElement[] = [document.querySelector('.custom-attr__avvalue[data-type="mAsset"][data-active="true"]')];
+        if (!cellElements[0]) {
+            cellElements.splice(0, 1);
+            protyle.wysiwyg.element.querySelectorAll(".av__cell--active").forEach((item: HTMLElement) => {
+                if (getTypeByCellElement(item) === "mAsset") {
+                    cellElements.push(item);
+                }
+            });
+        }
+        if (cellElements.length > 0) {
+            const blockElement = hasClosestBlock(cellElements[0]);
+            if (blockElement) {
+                updateCellsValue(protyle, blockElement, avAssets, cellElements);
+                document.querySelector(".av__panel")?.remove();
+                return;
+            }
+        } else {
             return;
         }
     }
@@ -168,6 +202,15 @@ export const uploadLocalFiles = (files: string[], protyle: IProtyle, isUpload: b
         id: protyle.block.rootID
     }, (response) => {
         hideMessage(msgId);
+        let tip = "";
+        Object.keys(response.data.succMap).forEach(name => {
+            if (response.data.succMap[name].startsWith("file:")) {
+                tip += name + ", ";
+            }
+        });
+        if (tip) {
+            showMessage(window.siyuan.languages.dndFolderTip.replace("${x}", `<b>${tip.substring(0, tip.length - 2)}</b>`));
+        }
         genUploadedLabel(JSON.stringify(response), protyle);
     });
 };

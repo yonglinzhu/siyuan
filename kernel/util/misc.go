@@ -18,12 +18,31 @@ package util
 
 import (
 	"bytes"
+	"math/rand"
 	"strconv"
 	"strings"
+	"time"
 	"unicode"
 
+	"github.com/88250/gulu"
 	"github.com/88250/lute/html"
 )
+
+func init() {
+	rand.Seed(time.Now().UTC().UnixNano())
+}
+
+var (
+	letter = []rune("abcdefghijklmnopqrstuvwxyz0123456789")
+)
+
+func RandString(length int) string {
+	b := make([]rune, length)
+	for i := range b {
+		b[i] = letter[rand.Intn(len(letter))]
+	}
+	return string(b)
+}
 
 // InsertElem inserts value at index into a.
 // 0 <= index <= len(s)
@@ -42,11 +61,26 @@ func RemoveElem[T any](s []T, index int) []T {
 	return append(s[:index], s[index+1:]...)
 }
 
-func EscapeHTML(s string) string {
-	if ContainsSubStr(s, []string{"&amp;", "&#39;", "&lt;", "&gt;", "&#34;", "&#13;"}) {
-		return s
+func EscapeHTML(s string) (ret string) {
+	ret = s
+	if "" == strings.TrimSpace(ret) {
+		return
 	}
-	return html.EscapeString(s)
+
+	ret = strings.ReplaceAll(ret, "&amp;", "__@amp__")
+	ret = strings.ReplaceAll(ret, "&#39;", "__@39__")
+	ret = strings.ReplaceAll(ret, "&lt;", "__@lt__")
+	ret = strings.ReplaceAll(ret, "&gt;", "__@gt__")
+	ret = strings.ReplaceAll(ret, "&#34;", "__@34__")
+	ret = strings.ReplaceAll(ret, "&#13;", "__@13__")
+	ret = html.EscapeString(ret)
+	ret = strings.ReplaceAll(ret, "__@amp__", "&amp;")
+	ret = strings.ReplaceAll(ret, "__@39__", "&#39;")
+	ret = strings.ReplaceAll(ret, "__@lt__", "&lt;")
+	ret = strings.ReplaceAll(ret, "__@gt__", "&gt;")
+	ret = strings.ReplaceAll(ret, "__@34__", "&#34;")
+	ret = strings.ReplaceAll(ret, "__@13__", "&#13;")
+	return
 }
 
 func Reverse(s string) string {
@@ -84,9 +118,22 @@ func RemoveRedundantSpace(str string) string {
 	return buf.String()
 }
 
-func IsNumeric(s string) bool {
-	_, err := strconv.ParseFloat(s, 64)
-	return err == nil
+func Convert2Float(s string) (float64, bool) {
+	s = gulu.Str.RemoveInvisible(s)
+	s = strings.ReplaceAll(s, " ", "")
+	s = strings.ReplaceAll(s, ",", "")
+	buf := bytes.Buffer{}
+	for _, r := range s {
+		if unicode.IsDigit(r) || '.' == r {
+			buf.WriteRune(r)
+		}
+	}
+	s = buf.String()
+	ret, err := strconv.ParseFloat(strings.TrimSpace(s), 64)
+	if nil != err {
+		return 0, false
+	}
+	return ret, true
 }
 
 func ContainsSubStr(s string, subStrs []string) bool {
@@ -96,4 +143,19 @@ func ContainsSubStr(s string, subStrs []string) bool {
 		}
 	}
 	return false
+}
+
+func ReplaceStr(strs []string, old, new string) (ret []string, changed bool) {
+	if old == new {
+		return strs, false
+	}
+
+	for i, v := range strs {
+		if v == old {
+			strs[i] = new
+			changed = true
+		}
+	}
+	ret = strs
+	return
 }

@@ -7,11 +7,16 @@ import {bindEditEvent, getEditHTML} from "./col";
 import {updateAttrViewCellAnimation} from "./action";
 import {genAVValueHTML} from "./blockAttr";
 import {escapeAttr} from "../../../util/escape";
-import {genCellValueByElement, getTypeByCellElement} from "./cell";
+import {genCellValueByElement} from "./cell";
 
-const filterSelectHTML = (key: string, options: { name: string, color: string }[]) => {
+const filterSelectHTML = (key: string, options: { name: string, color: string }[], selected: string[] = []) => {
     let html = "";
     let hasMatch = false;
+    if (selected.length === 0) {
+        document.querySelectorAll(".av__panel .b3-chips .b3-chip").forEach((item: HTMLElement) => {
+            selected.push(item.dataset.content);
+        });
+    }
     if (options) {
         options.forEach(item => {
             if (!key ||
@@ -25,6 +30,7 @@ const filterSelectHTML = (key: string, options: { name: string, color: string }[
         </span>
     </div>
     <svg class="b3-menu__action" data-type="setColOption"><use xlink:href="#iconEdit"></use></svg>
+    ${selected.includes(item.name) ? '<svg class="b3-menu__checked"><use xlink:href="#iconSelect"></use></svg></span>' : ""}
 </button>`;
             }
             if (key === item.name) {
@@ -43,12 +49,6 @@ const filterSelectHTML = (key: string, options: { name: string, color: string }[
 </div>
 <span class="b3-menu__accelerator">Enter</span>
 </button>${html}`;
-    } else {
-        if (key) {
-            html = html.replace(`class="b3-menu__item" data-name="${key}"` , `class="b3-menu__item b3-menu__item--current" data-name="${key}"`);
-        } else {
-            html = html.replace('class="b3-menu__item"' , 'class="b3-menu__item b3-menu__item--current"');
-        }
     }
     return html;
 };
@@ -66,7 +66,21 @@ export const removeCellOption = (protyle: IProtyle, data: IAV, cellElements: HTM
             item = cellElements[elementIndex] = blockElement.querySelector(`.av__cell[data-id="${item.dataset.id}"]`) as HTMLElement;
         }
         const rowID = (hasClosestByClassName(item, "av__row") as HTMLElement).dataset.id;
-        const cellValue = genCellValueByElement(getTypeByCellElement(item) || item.dataset.type as TAVCol, item);
+        let cellValue: IAVCellValue;
+        data.view.rows.find(row => {
+            if (row.id === rowID) {
+                row.cells.find(cell => {
+                    if (cell.value.keyID === item.dataset.colId) {
+                        if (!cell.value.mSelect) {
+                            cell.value.mSelect = [];
+                        }
+                        cellValue = cell.value;
+                        return true;
+                    }
+                });
+                return true;
+            }
+        });
         const oldValue = JSON.parse(JSON.stringify(cellValue));
         if (elementIndex === 0) {
             cellValue.mSelect?.find((item, index) => {
@@ -95,17 +109,6 @@ export const removeCellOption = (protyle: IProtyle, data: IAV, cellElements: HTM
             avID: data.id,
             data: oldValue
         });
-        data.view.rows.find(row => {
-            if (row.id === rowID) {
-                row.cells.find(cell => {
-                    if (cell.id === cellValue.id) {
-                        cell.value = cellValue;
-                        return true;
-                    }
-                });
-                return true;
-            }
-        });
         if (item.classList.contains("custom-attr__avvalue")) {
             item.innerHTML = genAVValueHTML(cellValue);
         } else {
@@ -113,6 +116,12 @@ export const removeCellOption = (protyle: IProtyle, data: IAV, cellElements: HTM
         }
     });
     transaction(protyle, doOperations, undoOperations);
+    Array.from(document.querySelectorAll(".av__panel .b3-menu__item")).find((item: HTMLElement) => {
+        if (item.dataset.name === target.dataset.content) {
+            item.querySelector(".b3-menu__checked")?.remove();
+            return true;
+        }
+    });
     target.remove();
 };
 
@@ -121,6 +130,7 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
     if (!menuElement) {
         return;
     }
+    const blockID = blockElement.getAttribute("data-node-id");
     const colId = cellElements ? cellElements[0].dataset.colId : menuElement.querySelector(".b3-menu__item").getAttribute("data-col-id");
     let name = target.parentElement.dataset.name;
     let color = target.parentElement.dataset.color;
@@ -175,7 +185,7 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
         });
         if (!cellElements) {
             menuElement.innerHTML = getEditHTML({protyle, data, colId, isCustomAttr});
-            bindEditEvent({protyle, data, menuElement, isCustomAttr});
+            bindEditEvent({protyle, data, menuElement, isCustomAttr, blockID});
         } else {
             cellElements.forEach((cellElement: HTMLMediaElement) => {
                 data.view.rows.find(row => {
@@ -253,7 +263,7 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
                 });
                 if (!cellElements) {
                     menuElement.innerHTML = getEditHTML({protyle, data, colId, isCustomAttr});
-                    bindEditEvent({protyle, data, menuElement, isCustomAttr});
+                    bindEditEvent({protyle, data, menuElement, isCustomAttr, blockID});
                 } else {
                     cellElements.forEach((cellElement: HTMLElement) => {
                         data.view.rows.find(row => {
@@ -287,15 +297,15 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
     menu.addSeparator();
     Array.from(Array(13).keys()).forEach(index => {
         menu.addItem({
-            accelerator: parseInt(color) === index + 1 ? '<svg class="svg" style="height: 30px; float: left;"><use xlink:href="#iconSelect"></use></svg>' : undefined,
+            checked: parseInt(color) === index + 1,
             iconHTML: "",
             label: `<span class="color__square"  style="padding: 5px;margin: 2px;color: var(--b3-font-color${index + 1});background-color: var(--b3-font-background${index + 1});">A</span>`,
             click(element) {
-                if (element.lastElementChild.classList.contains("b3-menu__accelerator")) {
+                if (element.lastElementChild.classList.contains("b3-menu__checked")) {
                     return;
                 }
-                element.parentElement.querySelector(".b3-menu__accelerator")?.remove();
-                element.insertAdjacentHTML("beforeend", '<span class="b3-menu__accelerator"><svg class="svg" style="height: 30px; float: left;"><use xlink:href="#iconSelect"></use></svg></span>');
+                element.parentElement.querySelector(".b3-menu__checked")?.remove();
+                element.insertAdjacentHTML("beforeend", '<svg class="b3-menu__checked"><use xlink:href="#iconSelect"></use></svg></span>');
                 transaction(protyle, [{
                     action: "updateAttrViewColOption",
                     id: colId,
@@ -332,7 +342,7 @@ export const setColOption = (protyle: IProtyle, data: IAV, target: HTMLElement, 
                 });
                 if (!cellElements) {
                     menuElement.innerHTML = getEditHTML({protyle, data, colId, isCustomAttr});
-                    bindEditEvent({protyle, data, menuElement, isCustomAttr});
+                    bindEditEvent({protyle, data, menuElement, isCustomAttr, blockID});
                 } else {
                     cellElements.forEach((cellElement: HTMLElement) => {
                         data.view.rows.find(row => {
@@ -398,22 +408,23 @@ export const bindSelectEvent = (protyle: IProtyle, data: IAV, menuElement: HTMLE
         }
         listElement.innerHTML = filterSelectHTML(inputElement.value, colData.options);
     });
-    inputElement.addEventListener("compositionend", (event: InputEvent) => {
-        if (event.isComposing) {
-            return;
-        }
+    inputElement.addEventListener("compositionend", () => {
         listElement.innerHTML = filterSelectHTML(inputElement.value, colData.options);
     });
     inputElement.addEventListener("keydown", (event: KeyboardEvent) => {
         if (event.isComposing) {
             return;
         }
-        let currentElement = upDownHint(listElement, event, "b3-menu__item--current");
+        let currentElement = upDownHint(listElement, event, "b3-menu__item--current", listElement.firstElementChild);
         if (event.key === "Enter") {
             if (!currentElement) {
                 currentElement = menuElement.querySelector(".b3-menu__item--current");
             }
-            addColOptionOrCell(protyle, data, cellElements, currentElement, menuElement, blockElement);
+            if (currentElement.querySelector(".b3-menu__checked")) {
+                removeCellOption(protyle, data, cellElements, menuElement.querySelector(`.b3-chips .b3-chip[data-content="${escapeAttr(currentElement.dataset.name)}"]`), blockElement);
+            } else {
+                addColOptionOrCell(protyle, data, cellElements, currentElement, menuElement, blockElement);
+            }
         } else if (event.key === "Backspace" && inputElement.value === "") {
             removeCellOption(protyle, data, cellElements, inputElement.previousElementSibling as HTMLElement, blockElement);
         }
@@ -462,7 +473,23 @@ export const addColOptionOrCell = (protyle: IProtyle, data: IAV, cellElements: H
         if (!itemRowElement) {
             return;
         }
-        const cellValue = genCellValueByElement(colData.type, item);
+        let cellValue: IAVCellValue;
+        const rowID = itemRowElement.dataset.id;
+        // 快速选中后如果 render 了再使用 genCellValueByElement 获取的元素和当前选中的不一致， https://github.com/siyuan-note/siyuan/issues/11268
+        data.view.rows.find(row => {
+            if (row.id === rowID) {
+                row.cells.find(cell => {
+                    if (cell.value.keyID === item.dataset.colId) {
+                        if (!cell.value.mSelect) {
+                            cell.value.mSelect = [];
+                        }
+                        cellValue = cell.value;
+                        return true;
+                    }
+                });
+                return true;
+            }
+        });
         const oldValue = JSON.parse(JSON.stringify(cellValue));
         if (index === 0) {
             if (colData.type === "mSelect") {
@@ -489,7 +516,6 @@ export const addColOptionOrCell = (protyle: IProtyle, data: IAV, cellElements: H
         } else {
             cellValue.mSelect = mSelectValue;
         }
-        const rowID = itemRowElement.dataset.id;
         cellDoOperations.push({
             action: "updateAttrViewCell",
             id: cellValue.id,
@@ -505,17 +531,6 @@ export const addColOptionOrCell = (protyle: IProtyle, data: IAV, cellElements: H
             rowID,
             avID: data.id,
             data: oldValue
-        });
-        data.view.rows.find(row => {
-            if (row.id === rowID) {
-                row.cells.find(cell => {
-                    if (cell.id === cellValue.id) {
-                        cell.value = cellValue;
-                        return true;
-                    }
-                });
-                return true;
-            }
         });
         if (item.classList.contains("custom-attr__avvalue")) {
             item.innerHTML = genAVValueHTML(cellValue);
@@ -562,7 +577,9 @@ export const getSelectHTML = (data: IAVTable, cellElements: HTMLElement[]) => {
     });
 
     let selectedHTML = "";
+    const selected: string[] = [];
     genCellValueByElement(colData.type, cellElements[0]).mSelect?.forEach((item) => {
+        selected.push(item.content);
         selectedHTML += `<div class="b3-chip b3-chip--middle" data-content="${escapeAttr(item.content)}" style="background-color:var(--b3-font-background${item.color});color:var(--b3-font-color${item.color})">${item.content}<svg class="b3-chip__close" data-type="removeCellOption"><use xlink:href="#iconCloseRound"></use></svg></div>`;
     });
 
@@ -571,6 +588,6 @@ export const getSelectHTML = (data: IAVTable, cellElements: HTMLElement[]) => {
     ${selectedHTML}
     <input>
 </div>
-<div>${filterSelectHTML("", colData.options)}</div>
+<div>${filterSelectHTML("", colData.options, selected)}</div>
 </div>`;
 };

@@ -19,7 +19,8 @@ package av
 import (
 	"math"
 	"sort"
-	"strconv"
+
+	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
 // LayoutTable 描述了表格布局的结构。
@@ -106,10 +107,11 @@ type TableColumn struct {
 	// 以下是某些列类型的特有属性
 
 	Options      []*SelectOption `json:"options,omitempty"`  // 选项列表
-	NumberFormat NumberFormat    `json:"numberFormat"`       // 列数字格式化
-	Template     string          `json:"template"`           // 模板内容
+	NumberFormat NumberFormat    `json:"numberFormat"`       // 数字列格式化
+	Template     string          `json:"template"`           // 模板列内容
 	Relation     *Relation       `json:"relation,omitempty"` // 关联列
 	Rollup       *Rollup         `json:"rollup,omitempty"`   // 汇总列
+	Date         *Date           `json:"date,omitempty"`     // 日期设置
 }
 
 type TableCell struct {
@@ -173,25 +175,33 @@ func (table *Table) SortRows(attrView *AttributeView) {
 		}
 	}
 
-	includeUneditedRows := map[string]bool{}
+	editedValRows := map[string]bool{}
 	for i, row := range table.Rows {
 		for _, colIndexSort := range colIndexSorts {
 			val := table.Rows[i].Cells[colIndexSort.Index].Value
-			if !val.IsEdited() {
-				// 如果该行的某个列的值是未编辑的，则该行不参与排序
-				includeUneditedRows[row.ID] = true
+			if KeyTypeCheckbox == val.Type {
+				if block := row.GetBlockValue(); nil != block && block.IsEdited() {
+					// 如果主键编辑过，则勾选框也算作编辑过，参与排序 https://github.com/siyuan-note/siyuan/issues/11016
+					editedValRows[row.ID] = true
+					break
+				}
+			}
+
+			if val.IsEdited() {
+				// 如果该行某列的值已经编辑过，则该行可参与排序
+				editedValRows[row.ID] = true
 				break
 			}
 		}
 	}
 
-	// 将包含未编辑的行和全部已编辑的行分开排序
+	// 将未编辑的行和已编辑的行分开排序
 	var uneditedRows, editedRows []*TableRow
 	for _, row := range table.Rows {
-		if _, ok := includeUneditedRows[row.ID]; ok {
-			uneditedRows = append(uneditedRows, row)
-		} else {
+		if _, ok := editedValRows[row.ID]; ok {
 			editedRows = append(editedRows, row)
+		} else {
+			uneditedRows = append(uneditedRows, row)
 		}
 	}
 
@@ -211,13 +221,17 @@ func (table *Table) SortRows(attrView *AttributeView) {
 		sorted := true
 		for _, colIndexSort := range colIndexSorts {
 			val1 := editedRows[i].Cells[colIndexSort.Index].Value
-			if nil == val1 {
-				return colIndexSort.Order == SortOrderAsc
-			}
-
 			val2 := editedRows[j].Cells[colIndexSort.Index].Value
-			if nil == val2 {
-				return colIndexSort.Order != SortOrderAsc
+			if nil == val1 || val1.IsEmpty() {
+				if nil != val2 && !val2.IsEmpty() {
+					return false
+				}
+				sorted = false
+				continue
+			} else {
+				if nil == val2 || val2.IsEmpty() {
+					return true
+				}
 			}
 
 			result := val1.Compare(val2, attrView)
@@ -412,7 +426,7 @@ func (table *Table) calcColTemplate(col *TableColumn, colIndex int) {
 		sum := 0.0
 		for _, row := range table.Rows {
 			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Template && "" != row.Cells[colIndex].Value.Template.Content {
-				val, _ := strconv.ParseFloat(row.Cells[colIndex].Value.Template.Content, 64)
+				val, _ := util.Convert2Float(row.Cells[colIndex].Value.Template.Content)
 				sum += val
 			}
 		}
@@ -422,7 +436,7 @@ func (table *Table) calcColTemplate(col *TableColumn, colIndex int) {
 		count := 0
 		for _, row := range table.Rows {
 			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Template && "" != row.Cells[colIndex].Value.Template.Content {
-				val, _ := strconv.ParseFloat(row.Cells[colIndex].Value.Template.Content, 64)
+				val, _ := util.Convert2Float(row.Cells[colIndex].Value.Template.Content)
 				sum += val
 				count++
 			}
@@ -434,7 +448,7 @@ func (table *Table) calcColTemplate(col *TableColumn, colIndex int) {
 		values := []float64{}
 		for _, row := range table.Rows {
 			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Template && "" != row.Cells[colIndex].Value.Template.Content {
-				val, _ := strconv.ParseFloat(row.Cells[colIndex].Value.Template.Content, 64)
+				val, _ := util.Convert2Float(row.Cells[colIndex].Value.Template.Content)
 				values = append(values, val)
 			}
 		}
@@ -450,7 +464,7 @@ func (table *Table) calcColTemplate(col *TableColumn, colIndex int) {
 		minVal := math.MaxFloat64
 		for _, row := range table.Rows {
 			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Template && "" != row.Cells[colIndex].Value.Template.Content {
-				val, _ := strconv.ParseFloat(row.Cells[colIndex].Value.Template.Content, 64)
+				val, _ := util.Convert2Float(row.Cells[colIndex].Value.Template.Content)
 				if val < minVal {
 					minVal = val
 				}
@@ -463,7 +477,7 @@ func (table *Table) calcColTemplate(col *TableColumn, colIndex int) {
 		maxVal := -math.MaxFloat64
 		for _, row := range table.Rows {
 			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Template && "" != row.Cells[colIndex].Value.Template.Content {
-				val, _ := strconv.ParseFloat(row.Cells[colIndex].Value.Template.Content, 64)
+				val, _ := util.Convert2Float(row.Cells[colIndex].Value.Template.Content)
 				if val > maxVal {
 					maxVal = val
 				}
@@ -477,7 +491,7 @@ func (table *Table) calcColTemplate(col *TableColumn, colIndex int) {
 		maxVal := -math.MaxFloat64
 		for _, row := range table.Rows {
 			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Template && "" != row.Cells[colIndex].Value.Template.Content {
-				val, _ := strconv.ParseFloat(row.Cells[colIndex].Value.Template.Content, 64)
+				val, _ := util.Convert2Float(row.Cells[colIndex].Value.Template.Content)
 				if val < minVal {
 					minVal = val
 				}
@@ -1584,8 +1598,8 @@ func (table *Table) calcColRollup(col *TableColumn, colIndex int) {
 		for _, row := range table.Rows {
 			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Rollup {
 				for _, content := range row.Cells[colIndex].Value.Rollup.Contents {
-					if !uniqueValues[content.String()] {
-						uniqueValues[content.String()] = true
+					if !uniqueValues[content.String(true)] {
+						uniqueValues[content.String(true)] = true
 						countUniqueValues++
 					}
 				}
@@ -1627,6 +1641,99 @@ func (table *Table) calcColRollup(col *TableColumn, colIndex int) {
 		}
 		if 0 < len(table.Rows) {
 			col.Calc.Result = &Value{Number: NewFormattedValueNumber(float64(countNotEmpty)/float64(len(table.Rows)), NumberFormatPercent)}
+		}
+	case CalcOperatorSum:
+		sum := 0.0
+		for _, row := range table.Rows {
+			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Rollup && 0 < len(row.Cells[colIndex].Value.Rollup.Contents) {
+				for _, content := range row.Cells[colIndex].Value.Rollup.Contents {
+					val, _ := util.Convert2Float(content.String(false))
+					sum += val
+				}
+			}
+		}
+		col.Calc.Result = &Value{Number: NewFormattedValueNumber(sum, col.NumberFormat)}
+	case CalcOperatorAverage:
+		sum := 0.0
+		count := 0
+		for _, row := range table.Rows {
+			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Rollup && 0 < len(row.Cells[colIndex].Value.Rollup.Contents) {
+				for _, content := range row.Cells[colIndex].Value.Rollup.Contents {
+					val, _ := util.Convert2Float(content.String(false))
+					sum += val
+					count++
+				}
+			}
+		}
+		if 0 != count {
+			col.Calc.Result = &Value{Number: NewFormattedValueNumber(sum/float64(count), col.NumberFormat)}
+		}
+	case CalcOperatorMedian:
+		values := []float64{}
+		for _, row := range table.Rows {
+			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Rollup && 0 < len(row.Cells[colIndex].Value.Rollup.Contents) {
+				for _, content := range row.Cells[colIndex].Value.Rollup.Contents {
+					val, _ := util.Convert2Float(content.String(false))
+					values = append(values, val)
+				}
+			}
+		}
+		sort.Float64s(values)
+		if 0 < len(values) {
+			if 0 == len(values)%2 {
+				col.Calc.Result = &Value{Number: NewFormattedValueNumber((values[len(values)/2-1]+values[len(values)/2])/2, col.NumberFormat)}
+			} else {
+				col.Calc.Result = &Value{Number: NewFormattedValueNumber(values[len(values)/2], col.NumberFormat)}
+			}
+		}
+	case CalcOperatorMin:
+		minVal := math.MaxFloat64
+		for _, row := range table.Rows {
+			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Rollup && 0 < len(row.Cells[colIndex].Value.Rollup.Contents) {
+				for _, content := range row.Cells[colIndex].Value.Rollup.Contents {
+					val, _ := util.Convert2Float(content.String(false))
+					if val < minVal {
+						minVal = val
+					}
+				}
+			}
+		}
+		if math.MaxFloat64 != minVal {
+			col.Calc.Result = &Value{Number: NewFormattedValueNumber(minVal, col.NumberFormat)}
+		}
+	case CalcOperatorMax:
+		maxVal := -math.MaxFloat64
+		for _, row := range table.Rows {
+			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Rollup && 0 < len(row.Cells[colIndex].Value.Rollup.Contents) {
+				for _, content := range row.Cells[colIndex].Value.Rollup.Contents {
+					val, _ := util.Convert2Float(content.String(false))
+					if val > maxVal {
+						maxVal = val
+					}
+				}
+			}
+		}
+		if -math.MaxFloat64 != maxVal {
+			col.Calc.Result = &Value{Number: NewFormattedValueNumber(maxVal, col.NumberFormat)}
+		}
+	case CalcOperatorRange:
+		minVal := math.MaxFloat64
+		maxVal := -math.MaxFloat64
+		for _, row := range table.Rows {
+			if nil != row.Cells[colIndex] && nil != row.Cells[colIndex].Value && nil != row.Cells[colIndex].Value.Rollup && 0 < len(row.Cells[colIndex].Value.Rollup.Contents) {
+				for _, content := range row.Cells[colIndex].Value.Rollup.Contents {
+					val, _ := util.Convert2Float(content.String(false))
+					if val < minVal {
+						minVal = val
+					}
+					if val > maxVal {
+						maxVal = val
+					}
+				}
+			}
+		}
+		if math.MaxFloat64 != minVal && -math.MaxFloat64 != maxVal {
+			col.Calc.Result = &Value{Number: NewFormattedValueNumber(maxVal-minVal, col.NumberFormat)}
 		}
 	}
 }

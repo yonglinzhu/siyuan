@@ -23,9 +23,9 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/88250/go-humanize"
 	"github.com/88250/gulu"
 	"github.com/djherbis/times"
-	"github.com/dustin/go-humanize"
 	"github.com/gin-gonic/gin"
 	"github.com/siyuan-note/filelock"
 	"github.com/siyuan-note/siyuan/kernel/model"
@@ -70,13 +70,23 @@ func statAsset(c *gin.Context) {
 		return
 	}
 
+	updated := t.ModTime().UnixMilli()
+	hUpdated := t.ModTime().Format("2006-01-02 15:04:05")
+	created := updated
+	hCreated := hUpdated
+	// Check birthtime before use
+	if t.HasBirthTime() {
+		created = t.BirthTime().UnixMilli()
+		hCreated = t.BirthTime().Format("2006-01-02 15:04:05")
+	}
+
 	ret.Data = map[string]interface{}{
 		"size":     info.Size(),
-		"hSize":    humanize.Bytes(uint64(info.Size())),
-		"created":  t.BirthTime().UnixMilli(),
-		"hCreated": t.BirthTime().Format("2006-01-02 15:04:05"),
-		"updated":  t.ModTime().UnixMilli(),
-		"hUpdated": t.ModTime().Format("2006-01-02 15:04:05"),
+		"hSize":    humanize.BytesCustomCeil(uint64(info.Size()), 2),
+		"created":  created,
+		"hCreated": hCreated,
+		"updated":  updated,
+		"hUpdated": hUpdated,
 	}
 }
 

@@ -122,6 +122,9 @@ const promiseTransaction = () => {
                             item.remove();
                         }
                     });
+                    if (protyle.disabled) {
+                        disabledProtyle(protyle);
+                    }
                     processRender(protyle.wysiwyg.element);
                     highlightRender(protyle.wysiwyg.element);
                     avRender(protyle.wysiwyg.element, protyle);
@@ -188,6 +191,7 @@ const promiseTransaction = () => {
                         blockRender(protyle, item);
                     }
                 });
+                hideElements(["gutter"], protyle);
                 return;
             }
             if (operation.action === "move") {
@@ -402,6 +406,9 @@ export const onTransaction = (protyle: IProtyle, operation: IOperation, isUndo: 
             }
         });
         if (operation.retData) {
+            if (protyle.disabled) {
+                disabledProtyle(protyle);
+            }
             processRender(protyle.wysiwyg.element);
             highlightRender(protyle.wysiwyg.element);
             avRender(protyle.wysiwyg.element, protyle);
@@ -728,9 +735,16 @@ export const onTransaction = (protyle: IProtyle, operation: IOperation, isUndo: 
         });
         // 更新 ws 引用块
         updateRef(protyle, operation.id);
-    } else if (operation.action === "append") {
-        reloadProtyle(protyle, false);
-    } else if (["addAttrViewCol", "insertAttrViewBlock", "updateAttrViewCol", "updateAttrViewColOptions",
+        return;
+    }
+    if (operation.action === "append") {
+        // 目前只有移动块的时候会调用，反连面板就自己点击刷新处理。
+        if (!protyle.options.backlinkData) {
+            reloadProtyle(protyle, false);
+        }
+        return;
+    }
+    if (["addAttrViewCol", "insertAttrViewBlock", "updateAttrViewCol", "updateAttrViewColOptions",
         "updateAttrViewColOption", "updateAttrViewCell", "sortAttrViewRow", "sortAttrViewCol", "setAttrViewColHidden",
         "setAttrViewColWrap", "setAttrViewColWidth", "removeAttrViewColOption", "setAttrViewName", "setAttrViewFilters",
         "setAttrViewSorts", "setAttrViewColCalc", "removeAttrViewCol", "updateAttrViewColNumberFormat", "removeAttrViewBlock",
@@ -738,10 +752,13 @@ export const onTransaction = (protyle: IProtyle, operation: IOperation, isUndo: 
         "removeAttrViewView", "setAttrViewViewName", "setAttrViewViewIcon", "duplicateAttrViewView", "sortAttrViewView",
         "updateAttrViewColRelation", "setAttrViewPageSize", "updateAttrViewColRollup"].includes(operation.action)) {
         refreshAV(protyle, operation);
-    } else if (operation.action === "doUpdateUpdated") {
+        return;
+    }
+    if (operation.action === "doUpdateUpdated") {
         updateElements.forEach(item => {
             item.setAttribute("updated", operation.data);
         });
+        return;
     }
 };
 
@@ -1015,7 +1032,7 @@ export const transaction = (protyle: IProtyle, doOperations: IOperation[], undoO
         return;
     }
     if (!protyle) {
-        // 文档书中点开属性->数据库后的变更操作
+        // 文档树中点开属性->数据库后的变更操作 & 文档树添加到数据库
         fetchPost("/api/transactions", {
             session: Constants.SIYUAN_APPID,
             app: Constants.SIYUAN_APPID,

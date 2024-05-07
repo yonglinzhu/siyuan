@@ -197,6 +197,12 @@ func getNodeRefText0(node *ast.Node) string {
 		return "Video..."
 	case ast.NodeAudio:
 		return "Audio..."
+	case ast.NodeAttributeView:
+		ret, _ := av.GetAttributeViewName(node.AttributeViewID)
+		if "" == ret {
+			ret = "Database..."
+		}
+		return ret
 	}
 
 	if ast.NodeDocument != node.Type && node.IsContainerBlock() {
@@ -361,11 +367,11 @@ func buildBlockBreadcrumb(node *ast.Node, excludeTypes []string) (ret []*BlockPa
 			fc = fc.Next
 		}
 
-		name := util.EscapeHTML(parent.IALAttr("name"))
+		name := parent.IALAttr("name")
 		if ast.NodeDocument == parent.Type {
-			name = util.EscapeHTML(box.Name) + util.EscapeHTML(hPath)
+			name = box.Name + hPath
 		} else if ast.NodeAttributeView == parent.Type {
-			name = treenode.GetAttributeViewName(parent.AttributeViewID)
+			name, _ = av.GetAttributeViewName(parent.AttributeViewID)
 		} else {
 			if "" == name {
 				if ast.NodeListItem == parent.Type {
@@ -393,10 +399,11 @@ func buildBlockBreadcrumb(node *ast.Node, excludeTypes []string) (ret []*BlockPa
 		}
 
 		name = strings.ReplaceAll(name, editor.Caret, "")
+		name = util.EscapeHTML(name)
 		if add {
 			ret = append([]*BlockPath{{
 				ID:      id,
-				Name:    util.EscapeHTML(name),
+				Name:    name,
 				Type:    parent.Type.String(),
 				SubType: treenode.SubTypeAbbr(parent),
 			}}, ret...)
@@ -415,9 +422,10 @@ func buildBlockBreadcrumb(node *ast.Node, excludeTypes []string) (ret []*BlockPa
 
 			if ast.NodeHeading == b.Type && headingLevel > b.HeadingLevel {
 				name = gulu.Str.SubStr(renderBlockText(b, excludeTypes), maxNameLen)
+				name = util.EscapeHTML(name)
 				ret = append([]*BlockPath{{
 					ID:      b.ID,
-					Name:    util.EscapeHTML(name),
+					Name:    name,
 					Type:    b.Type.String(),
 					SubType: treenode.SubTypeAbbr(b),
 				}}, ret...)

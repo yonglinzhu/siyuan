@@ -2,7 +2,7 @@ import {getAllModels} from "../getAll";
 import {Tab} from "../Tab";
 import {Graph} from "./Graph";
 import {Outline} from "./Outline";
-import {getInstanceById, getWndByLayout, saveLayout, switchWnd} from "../util";
+import {fixWndFlex1, getInstanceById, getWndByLayout, saveLayout, switchWnd} from "../util";
 import {resizeTabs} from "../tabUtil";
 import {Backlink} from "./Backlink";
 import {App} from "../../index";
@@ -159,10 +159,10 @@ export const openOutline = async (protyle: IProtyle) => {
             }));
         }
     }), false, false);
+    newWnd.element.style.width = "200px";
+    newWnd.element.classList.remove("fn__flex-1");
     switchWnd(newWnd, wnd);
-    // https://github.com/siyuan-note/siyuan/issues/10500
-    wnd.element.classList.remove("fn__flex-1");
-    wnd.element.style.width = wnd.element.parentElement.clientWidth - 200 + "px";
+    fixWndFlex1(newWnd.parent);
     saveLayout();
 };
 
@@ -195,4 +195,42 @@ export const toggleDockBar = (useElement: Element) => {
     });
     resizeTabs();
     resetFloatDockSize();
+};
+
+export const clearOBG = () => {
+    const models = getAllModels();
+    models.outline.find(item => {
+        if (item.type === "pin") {
+            if ("" === item.blockId) {
+                return;
+            }
+            item.isPreview = false;
+            item.update({data: [], msg: "", code: 0}, "");
+            item.updateDocTitle();
+        }
+    });
+    models.graph.forEach(item => {
+        if (item.type !== "global") {
+            if (item.type === "local") {
+                return;
+            }
+            if ("" === item.blockId) {
+                return;
+            }
+            item.blockId = "";
+            item.graphData = undefined;
+            item.onGraph(false);
+        }
+    });
+    models.backlink.forEach(item => {
+        if (item.type === "local") {
+            return;
+        }
+        if ("" === item.blockId) {
+            return;
+        }
+        item.saveStatus();
+        item.blockId = "";
+        item.render(undefined);
+    });
 };

@@ -9,8 +9,11 @@ import {updateAttrViewCellAnimation} from "./action";
 import {focusBlock} from "../../util/selection";
 import {setPosition} from "../../../util/setPosition";
 
-const genSearchList = (element: Element, keyword: string, avId: string, cb?: () => void) => {
-    fetchPost("/api/av/searchAttributeView", {keyword}, (response) => {
+const genSearchList = (element: Element, keyword: string, avId?: string, excludes = true, cb?: () => void) => {
+    fetchPost("/api/av/searchAttributeView", {
+        keyword,
+        excludes: (excludes && avId) ? [avId] : undefined
+    }, (response) => {
         let html = "";
         response.data.results.forEach((item: {
             avID: string
@@ -45,7 +48,7 @@ const setDatabase = (avId: string, element: HTMLElement, item: HTMLElement) => {
     }
 };
 
-export const openSearchAV = (avId: string, target: HTMLElement, cb?: (element: HTMLElement) => void) => {
+export const openSearchAV = (avId: string, target: HTMLElement, cb?: (element: HTMLElement) => void, excludes = true) => {
     window.siyuan.menus.menu.remove();
     const menu = new Menu();
     menu.addItem({
@@ -86,10 +89,10 @@ export const openSearchAV = (avId: string, target: HTMLElement, cb?: (element: H
                 if (event.isComposing) {
                     return;
                 }
-                genSearchList(listElement, inputElement.value, avId);
+                genSearchList(listElement, inputElement.value, avId, excludes);
             });
             inputElement.addEventListener("compositionend", () => {
-                genSearchList(listElement, inputElement.value, avId);
+                genSearchList(listElement, inputElement.value, avId, excludes);
             });
             element.lastElementChild.addEventListener("click", (event) => {
                 const listItemElement = hasClosestByClassName(event.target as HTMLElement, "b3-list-item");
@@ -103,7 +106,7 @@ export const openSearchAV = (avId: string, target: HTMLElement, cb?: (element: H
                     window.siyuan.menus.menu.remove();
                 }
             });
-            genSearchList(listElement, "", avId, () => {
+            genSearchList(listElement, "", avId, excludes, () => {
                 const rect = target.getBoundingClientRect();
                 menu.open({
                     x: rect.left,
@@ -146,7 +149,7 @@ export const updateRelation = (options: {
         avID: options.avID,
         keyID: colId,
         id: newAVId || colData.relation.avID,
-        backRelationKeyID: colData.relation.avID === newAVId ? colData.relation.backKeyID : Lute.NewNodeID(),
+        backRelationKeyID: colData.relation.avID === newAVId ? (colData.relation.backKeyID || Lute.NewNodeID()) : Lute.NewNodeID(),
         isTwoWay: (options.avElement.querySelector(".b3-switch") as HTMLInputElement).checked,
         name: inputElement.value,
         format: colNewName
@@ -277,7 +280,6 @@ export const bindRelationEvent = (options: {
                 html += genSelectItemHTML("unselect", item.block.id, item.isDetached, item.block.content || window.siyuan.languages.untitled);
             }
         });
-        options.menuElement.querySelector(".b3-menu__label").innerHTML = response.data.name;
         options.menuElement.querySelector(".b3-menu__items").innerHTML = `${selectHTML || genSelectItemHTML("empty")}
 <button class="b3-menu__separator"></button>
 ${html || genSelectItemHTML("empty")}`;
@@ -286,9 +288,11 @@ ${html || genSelectItemHTML("empty")}`;
         options.menuElement.querySelector(".b3-menu__items .b3-menu__item:not(.fn__none)").classList.add("b3-menu__item--current");
         const inputElement = options.menuElement.querySelector("input");
         inputElement.focus();
+        const databaseName = inputElement.parentElement.querySelector(".popover__block");
+        databaseName.innerHTML = response.data.name;
+        databaseName.setAttribute("data-id", response.data.blockIDs[0]);
         const listElement = options.menuElement.querySelector(".b3-menu__items");
         inputElement.addEventListener("keydown", (event) => {
-            event.stopPropagation();
             if (event.isComposing) {
                 return;
             }
@@ -328,9 +332,10 @@ export const getRelationHTML = (data: IAV, cellElements?: HTMLElement[]) => {
     });
     if (colRelationData && colRelationData.avID) {
         return `<div data-av-id="${colRelationData.avID}" class="fn__flex-column">
-<div class="b3-menu__item fn__flex-column" data-type="nobg">
-    <div class="b3-menu__label">&nbsp;</div>
-    <input class="b3-text-field fn__flex-shrink"/>
+<div class="b3-menu__item" data-type="nobg">
+    <input class="b3-text-field fn__flex-1"/>
+    <span class="fn__space"></span>
+    <span style="color: var(--b3-protyle-inline-blockref-color);" data-id="" class="popover__block fn__pointer"></span>
 </div>
 <div class="fn__hr"></div>
 <div class="b3-menu__items">

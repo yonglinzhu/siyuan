@@ -241,6 +241,15 @@
       color: var(--b3-protyle-inline-fileref-color);
     }
 
+    span[data-type~="block-ref"],
+    span[data-type~="file-annotation-ref"] {
+      cursor: pointer;
+
+      &:hover {
+        opacity: 1;
+      }
+    }
+
     &.render-node {
       min-height: 32px;
 
@@ -450,7 +459,7 @@
 
   &--hl,
   &--hl .hljs {
-    transition: var(--b3-transition);
+    transition: var(--b3-background-transition);
     background-color: var(--b3-theme-primary-lightest) !important;
   }
 
@@ -590,8 +599,6 @@
 .protyle-wysiwyg[data-readonly="false"] {
   span[data-type~="inline-math"],
   span[data-type~="tag"],
-  span[data-type~="block-ref"],
-  span[data-type~="file-annotation-ref"],
   .protyle-action__language,
   .img > span:nth-child(2),
   .render-node {
@@ -600,11 +607,6 @@
 
   span[data-type~="tag"]:hover {
     background-color: var(--b3-theme-surface-lighter);
-  }
-
-  span[data-type~="block-ref"]:hover,
-  span[data-type~="file-annotation-ref"]:hover {
-    opacity: 1;
   }
 
   .code-block .protyle-action {
@@ -633,7 +635,8 @@
 }
 
 .protyle-wysiwyg:not([contenteditable]),
-.protyle-wysiwyg[data-readonly="true"] {
+.protyle-wysiwyg[data-readonly="true"],
+.protyle-wysiwyg__embed {
   .img:hover .protyle-icons {
     display: none;
   }

@@ -71,7 +71,8 @@ const processAV = (range: Range, html: string, protyle: IProtyle, blockElement: 
                     return true;
                 }
                 const type = getTypeByCellElement(cellElement) || cellElement.dataset.type as TAVCol;
-                if (["created", "updated", "template", "rollup"].includes(type)) {
+                if (["created", "updated", "template", "rollup"].includes(type) ||
+                    (type === "block" && !cellElement.dataset.detached)) {
                     return;
                 }
                 const rowID = currentRowElement.getAttribute("data-id");
@@ -89,7 +90,8 @@ const processAV = (range: Range, html: string, protyle: IProtyle, blockElement: 
                         return;
                     }
                     cellValue = genCellValue(type, cellValue[cellValue.type as "text"].content.toString());
-                } else if (cellValue.type === "block") {
+                }
+                if (cellValue.type === "block") {
                     cellValue.isDetached = true;
                     delete cellValue.block.id;
                 }
@@ -135,6 +137,30 @@ const processAV = (range: Range, html: string, protyle: IProtyle, blockElement: 
         }
         return;
     }
+    const contenteditableElement = getContenteditableElement(tempElement.content.firstElementChild);
+    if (contenteditableElement && contenteditableElement.childNodes.length === 1 && contenteditableElement.firstElementChild?.getAttribute("data-type") === "block-ref") {
+        const selectCellElement = blockElement.querySelector(".av__cell--select") as HTMLElement;
+        if (selectCellElement) {
+            const avID = blockElement.dataset.avId;
+            const sourceId = contenteditableElement.firstElementChild.getAttribute("data-id");
+            const previousID = selectCellElement.dataset.blockId;
+            transaction(protyle, [{
+                action: "replaceAttrViewBlock",
+                avID,
+                previousID,
+                nextID: sourceId,
+                isDetached: false,
+            }], [{
+                action: "replaceAttrViewBlock",
+                avID,
+                previousID: sourceId,
+                nextID: previousID,
+                isDetached: selectCellElement.dataset.detached === "true",
+            }]);
+            return;
+        }
+    }
+
     const text = protyle.lute.BlockDOM2EscapeMarkerContent(html);
     const cellsElement: HTMLElement[] = Array.from(blockElement.querySelectorAll(".av__cell--select"));
     const rowsElement = blockElement.querySelector(".av__row--select");
@@ -142,7 +168,7 @@ const processAV = (range: Range, html: string, protyle: IProtyle, blockElement: 
         updateCellsValue(protyle, blockElement as HTMLElement, text);
     } else if (cellsElement.length > 0) {
         updateCellsValue(protyle, blockElement as HTMLElement, text, cellsElement);
-    } else {
+    } else if (hasClosestByClassName(range.startContainer, "av__title")) {
         range.insertNode(document.createTextNode(text));
         range.collapse(false);
         updateAVName(protyle, blockElement);

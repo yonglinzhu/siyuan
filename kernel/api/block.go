@@ -29,7 +29,7 @@ import (
 	"github.com/siyuan-note/siyuan/kernel/util"
 )
 
-func getParentNextChildID(c *gin.Context) {
+func getBlockSiblingID(c *gin.Context) {
 	ret := gulu.Ret.NewResult()
 	defer c.JSON(http.StatusOK, ret)
 
@@ -39,8 +39,11 @@ func getParentNextChildID(c *gin.Context) {
 	}
 
 	id := arg["id"].(string)
+	parent, previous, next := model.GetBlockSiblingID(id)
 	ret.Data = map[string]string{
-		"id": model.GetParentNextChildID(id),
+		"parent":   parent,
+		"next":     next,
+		"previous": previous,
 	}
 }
 
@@ -465,7 +468,8 @@ func getBlockInfo(c *gin.Context) {
 
 	id := arg["id"].(string)
 
-	tree, err := model.LoadTreeByBlockID(id)
+	// 仅在此处使用带重建索引的加载函数，其他地方不要使用
+	tree, err := model.LoadTreeByBlockIDWithReindex(id)
 	if errors.Is(err, model.ErrIndexing) {
 		ret.Code = 3
 		ret.Msg = model.Conf.Language(56)
